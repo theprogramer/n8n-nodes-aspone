@@ -41,7 +41,7 @@ describe('PncpNode', () => {
 		const result = await node.execute.call(mockExecuteFunctions);
 
 		expect(mockHttpRequest).toHaveBeenCalledWith(
-			'pncpCredential',
+			'pncpApi',
 			{
 				baseURL: 'https://api.pncp.gov.br/api/consulta',
 				url: '/v1/pca/usuario',

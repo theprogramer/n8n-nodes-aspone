@@ -3,9 +3,10 @@ import {
 	INodeProperties,
 } from 'n8n-workflow';
 
-export class Pncp implements ICredentialType {
-	name = 'pncpCredential';
-	displayName = 'PNCP Credential';
+export class PncpApi implements ICredentialType {
+	name = 'pncpApi';
+	displayName = 'PNCP API';
+	documentationUrl = 'https://www.gov.br/pncp/pt-br';
 
 	properties: INodeProperties[] = [
 		{
@@ -14,6 +15,6 @@ export class Pncp implements ICredentialType {
 			type: 'hidden',
 			default: 'https://pncp.gov.br/api/consulta',
 			description: 'A URL base da API PNCP',
-		}
+		},
 	];
 }

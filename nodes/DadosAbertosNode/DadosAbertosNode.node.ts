@@ -15,9 +15,10 @@ export class DadosAbertosNode implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Dados Abertos Node',
 		name: 'dadosAbertosNode',
-		icon: 'file:dados-abertos.png',
+		icon: 'file:dadosAbertos.svg',
 		group: ['transform'],
 		version: 1,
+		subtitle: '={{ $parameter["operation"] + ": " + $parameter["resource"] }}',
 		description: 'Basic Example Node',
 		defaults: {
 			name: 'Example Node',

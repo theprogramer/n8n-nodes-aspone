@@ -1,19 +1,24 @@
 {
   "name": "n8n-nodes-aspone",
   "version": "0.1.1",
-  "description": "",
+  "description": "Nodes n8n para integração com APIs públicas brasileiras (PNCP e Compras Dados Abertos)",
   "keywords": [
-    "n8n-community-node-package"
+    "n8n-community-node-package",
+    "n8n",
+    "pncp",
+    "compras-publicas",
+    "dados-abertos",
+    "brasil"
   ],
   "license": "MIT",
-  "homepage": "",
+  "homepage": "https://github.com/aspone/n8n-nodes-aspone",
   "author": {
-    "name": "",
-    "email": ""
+    "name": "ASP One",
+    "email": "contato@aspone.com.br"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/<...>/n8n-nodes-<...>.git"
+    "url": "git+https://github.com/aspone/n8n-nodes-aspone.git"
   },
   "engines": {
     "node": ">=20.15"
@@ -34,12 +39,11 @@
   "n8n": {
     "n8nNodesApiVersion": 1,
     "credentials": [
-      "dist/credentials/ExampleCredentialsApi.credentials.js",
-      "dist/credentials/HttpBinApi.credentials.js"
+      "dist/credentials/PncpApi.credentials.js"
     ],
     "nodes": [
-      "dist/nodes/ExampleNode/ExampleNode.node.js",
-      "dist/nodes/HttpBin/HttpBin.node.js"
+      "dist/nodes/Pncp/Pncp.node.js",
+      "dist/nodes/DadosAbertosNode/DadosAbertosNode.node.js"
     ]
   },
   "devDependencies": {

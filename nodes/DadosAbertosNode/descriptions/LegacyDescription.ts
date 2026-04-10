@@ -69,7 +69,7 @@ export const legacyOperations: INodeProperties[] = [
 
 export const legacyFields: INodeProperties[] = [
 	{
-		displayName: 'Tender Id',
+		displayName: 'Tender ID',
 		description: 'ID Compra',
 		name: 'id_compra',
 		default: '',
@@ -144,7 +144,7 @@ export const legacyFields: INodeProperties[] = [
 	{
 		displayName: 'Subject to Law 14.133',
 		name: 'pertence14133',
-		default: 'true',
+		default: false,
 		type: 'boolean',
 		displayOptions: {
 			show: {
