@@ -3,10 +3,7 @@ import type {
 	// INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
-} from 'n8n-workflow';
-import {
 	NodeConnectionType,
-	// NodeOperationError
 } from 'n8n-workflow';
 
 import {
@@ -25,8 +22,8 @@ export class DadosAbertosNode implements INodeType {
 		defaults: {
 			name: 'Example Node',
 		},
-		inputs: [NodeConnectionType.Main],
-		outputs: [NodeConnectionType.Main],
+		inputs: ['main'] as [NodeConnectionType],
+		outputs: ['main'] as [NodeConnectionType],
 		usableAsTool: true,
 	  requestDefaults: {
 			baseURL: '=https://dadosabertos.compras.gov.br',

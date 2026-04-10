@@ -1,4 +1,85 @@
-import { INodeTypeDescription, NodeConnectionType } from 'n8n-workflow';
+import { INodePropertyOptions, INodeTypeDescription, NodeConnectionType } from 'n8n-workflow';
+
+// Entrada inerte usada em selects de campos opcionais para permitir "não filtrar"
+const NONE_OPTION: INodePropertyOptions = { name: '- Não Filtrar -', value: '' };
+
+const UF_OPTIONS = [
+	{ name: 'Acre (AC)', value: 'AC' },
+	{ name: 'Alagoas (AL)', value: 'AL' },
+	{ name: 'Amapá (AP)', value: 'AP' },
+	{ name: 'Amazonas (AM)', value: 'AM' },
+	{ name: 'Bahia (BA)', value: 'BA' },
+	{ name: 'Ceará (CE)', value: 'CE' },
+	{ name: 'Distrito Federal (DF)', value: 'DF' },
+	{ name: 'Espírito Santo (ES)', value: 'ES' },
+	{ name: 'Goiás (GO)', value: 'GO' },
+	{ name: 'Maranhão (MA)', value: 'MA' },
+	{ name: 'Mato Grosso (MT)', value: 'MT' },
+	{ name: 'Mato Grosso do Sul (MS)', value: 'MS' },
+	{ name: 'Minas Gerais (MG)', value: 'MG' },
+	{ name: 'Pará (PA)', value: 'PA' },
+	{ name: 'Paraíba (PB)', value: 'PB' },
+	{ name: 'Paraná (PR)', value: 'PR' },
+	{ name: 'Pernambuco (PE)', value: 'PE' },
+	{ name: 'Piauí (PI)', value: 'PI' },
+	{ name: 'Rio de Janeiro (RJ)', value: 'RJ' },
+	{ name: 'Rio Grande Do Norte (RN)', value: 'RN' },
+	{ name: 'Rio Grande Do Sul (RS)', value: 'RS' },
+	{ name: 'Rondônia (RO)', value: 'RO' },
+	{ name: 'Roraima (RR)', value: 'RR' },
+	{ name: 'Santa Catarina (SC)', value: 'SC' },
+	{ name: 'São Paulo (SP)', value: 'SP' },
+	{ name: 'Sergipe (SE)', value: 'SE' },
+	{ name: 'Tocantins (TO)', value: 'TO' },
+];
+
+// Valores conforme Manual das APIs de Consulta do PNCP
+const MODALIDADE_CONTRATACAO_OPTIONS = [
+	{ name: 'Leilão - Eletrônico', value: '1' },
+	{ name: 'Diálogo Competitivo', value: '2' },
+	{ name: 'Concurso', value: '3' },
+	{ name: 'Concorrência - Eletrônica', value: '4' },
+	{ name: 'Concorrência - Presencial', value: '5' },
+	{ name: 'Pregão - Eletrônico', value: '6' },
+	{ name: 'Pregão - Presencial', value: '7' },
+	{ name: 'Dispensa de Licitação', value: '8' },
+	{ name: 'Inexigibilidade', value: '9' },
+	{ name: 'Manifestação de Interesse', value: '10' },
+	{ name: 'Pré-Qualificação', value: '11' },
+	{ name: 'Credenciamento', value: '12' },
+	{ name: 'Leilão - Presencial', value: '13' },
+	{ name: 'Inaplicabilidade da Licitação', value: '14' },
+];
+
+const MODO_DISPUTA_OPTIONS = [
+	{ name: 'Aberto', value: 1 },
+	{ name: 'Fechado', value: 2 },
+	{ name: 'Aberto-Fechado', value: 3 },
+	{ name: 'Dispensa Com Disputa', value: 4 },
+	{ name: 'Não Se Aplica', value: 5 },
+	{ name: 'Fechado-Aberto', value: 6 },
+];
+
+const TIPO_INSTRUMENTO_COBRANCA_OPTIONS = [
+	{ name: 'Nota Fiscal Eletrônica', value: 1 },
+	{ name: 'Nota Fiscal Avulsa', value: 2 },
+	{ name: 'Nota Fiscal de Serviços Eletrônica (NFS-E)', value: 3 },
+	{ name: 'Fatura', value: 4 },
+	{ name: 'Recibo', value: 5 },
+	{ name: 'Outros', value: 6 },
+];
+
+// Variantes opcionais: prepende uma entrada vazia para que o usuário possa limpar o filtro
+const UF_OPTIONS_OPTIONAL: INodePropertyOptions[] = [NONE_OPTION, ...UF_OPTIONS];
+const MODALIDADE_CONTRATACAO_OPTIONS_OPTIONAL: INodePropertyOptions[] = [
+	NONE_OPTION,
+	...MODALIDADE_CONTRATACAO_OPTIONS,
+];
+const MODO_DISPUTA_OPTIONS_OPTIONAL: INodePropertyOptions[] = [NONE_OPTION, ...MODO_DISPUTA_OPTIONS];
+const TIPO_INSTRUMENTO_COBRANCA_OPTIONS_OPTIONAL: INodePropertyOptions[] = [
+	NONE_OPTION,
+	...TIPO_INSTRUMENTO_COBRANCA_OPTIONS,
+];
 
 export const pncpDescription: INodeTypeDescription = {
 	displayName: 'PNCP',
@@ -478,17 +559,9 @@ export const pncpDescription: INodeTypeDescription = {
 			displayName: 'Modalidade de Contratação',
 			name: 'codigoModalidadeContratacao',
 			type: 'options',
-			default: '',
-			description: 'Selecione uma ou mais modalidades de contratação',
-			options: [
-				{ name: 'Concorrência', value: '1' },
-				{ name: 'Concurso', value: '2' },
-				{ name: 'Leilão', value: '3' },
-				{ name: 'Pregão', value: '4' },
-				{ name: 'Diálogo Competitivo', value: '5' },
-				{ name: 'Dispensa de Licitação', value: '6' },
-				{ name: 'Inexigibilidade', value: '7' },
-			],
+			default: '1',
+			description: 'Modalidade de contratação',
+			options: MODALIDADE_CONTRATACAO_OPTIONS,
 			displayOptions: {
 				show: {
 					resource: ['contratacao'],
@@ -498,21 +571,19 @@ export const pncpDescription: INodeTypeDescription = {
 			required: true,
 		},
 		{
-			displayName: 'Código do Modo de Disputa',
+			displayName: 'Modo de Disputa',
 			name: 'codigoModoDisputa',
-			type: 'number',
-			typeOptions: {
-				numberType: 'integer',
-			},
+			type: 'options',
+			options: MODO_DISPUTA_OPTIONS_OPTIONAL,
 			displayOptions: {
 				show: {
 					resource: ['contratacao'],
 					operation: ['consultarPorDataPublicacao'],
 				},
 			},
-			default: 0,
+			default: '',
 			required: false,
-			description: 'Código do modo de disputa (opcional)',
+			description: 'Modo de disputa da contratação (opcional)',
 		},
 		{
 			displayName: 'UF',
@@ -521,35 +592,7 @@ export const pncpDescription: INodeTypeDescription = {
 			default: '',
 			required: false,
 			description: 'Sigla da UF (opcional)',
-			options: [
-				{ name: 'AC', value: 'AC' },
-				{ name: 'AL', value: 'AL' },
-				{ name: 'AM', value: 'AM' },
-				{ name: 'AP', value: 'AP' },
-				{ name: 'BA', value: 'BA' },
-				{ name: 'CE', value: 'CE' },
-				{ name: 'DF', value: 'DF' },
-				{ name: 'ES', value: 'ES' },
-				{ name: 'GO', value: 'GO' },
-				{ name: 'MA', value: 'MA' },
-				{ name: 'MG', value: 'MG' },
-				{ name: 'MS', value: 'MS' },
-				{ name: 'MT', value: 'MT' },
-				{ name: 'PA', value: 'PA' },
-				{ name: 'PB', value: 'PB' },
-				{ name: 'PE', value: 'PE' },
-				{ name: 'PI', value: 'PI' },
-				{ name: 'PR', value: 'PR' },
-				{ name: 'RJ', value: 'RJ' },
-				{ name: 'RN', value: 'RN' },
-				{ name: 'RO', value: 'RO' },
-				{ name: 'RR', value: 'RR' },
-				{ name: 'RS', value: 'RS' },
-				{ name: 'SC', value: 'SC' },
-				{ name: 'SE', value: 'SE' },
-				{ name: 'SP', value: 'SP' },
-				{ name: 'TO', value: 'TO' },
-			],
+			options: UF_OPTIONS_OPTIONAL,
 			displayOptions: {
 				show: {
 					resource: ['contratacao'],
@@ -558,15 +601,17 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 		},
 		{
-			displayName: 'Código do Município IBGE',
+			displayName: 'Município Name or ID',
 			name: 'codigoMunicipioIbge',
-			type: 'number',
+			type: 'options',
 			typeOptions: {
-				numberType: 'integer',
+				loadOptionsMethod: 'getCidades',
+				loadOptionsDependsOn: ['uf'],
 			},
-			default: 0,
+			default: '',
 			required: false,
-			description: 'Código IBGE do município (opcional)',
+			description:
+				'Selecione um município após escolher a UF. O código IBGE é enviado automaticamente para a API. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			displayOptions: {
 				show: {
 					resource: ['contratacao'],
@@ -676,16 +721,8 @@ export const pncpDescription: INodeTypeDescription = {
 			name: 'codigoModalidadeContratacao',
 			type: 'options',
 			default: '',
-			description: 'Selecione uma ou mais modalidades de contratação',
-			options: [
-				{ name: 'Concorrência', value: '1' },
-				{ name: 'Concurso', value: '2' },
-				{ name: 'Leilão', value: '3' },
-				{ name: 'Pregão', value: '4' },
-				{ name: 'Diálogo Competitivo', value: '5' },
-				{ name: 'Dispensa de Licitação', value: '6' },
-				{ name: 'Inexigibilidade', value: '7' },
-			],
+			description: 'Modalidade de contratação (opcional)',
+			options: MODALIDADE_CONTRATACAO_OPTIONS_OPTIONAL,
 			displayOptions: {
 				show: {
 					resource: ['contratacao'],
@@ -701,35 +738,7 @@ export const pncpDescription: INodeTypeDescription = {
 			default: '',
 			required: false,
 			description: 'Sigla da UF (opcional)',
-			options: [
-				{ name: 'AC', value: 'AC' },
-				{ name: 'AL', value: 'AL' },
-				{ name: 'AM', value: 'AM' },
-				{ name: 'AP', value: 'AP' },
-				{ name: 'BA', value: 'BA' },
-				{ name: 'CE', value: 'CE' },
-				{ name: 'DF', value: 'DF' },
-				{ name: 'ES', value: 'ES' },
-				{ name: 'GO', value: 'GO' },
-				{ name: 'MA', value: 'MA' },
-				{ name: 'MG', value: 'MG' },
-				{ name: 'MS', value: 'MS' },
-				{ name: 'MT', value: 'MT' },
-				{ name: 'PA', value: 'PA' },
-				{ name: 'PB', value: 'PB' },
-				{ name: 'PE', value: 'PE' },
-				{ name: 'PI', value: 'PI' },
-				{ name: 'PR', value: 'PR' },
-				{ name: 'RJ', value: 'RJ' },
-				{ name: 'RN', value: 'RN' },
-				{ name: 'RO', value: 'RO' },
-				{ name: 'RR', value: 'RR' },
-				{ name: 'RS', value: 'RS' },
-				{ name: 'SC', value: 'SC' },
-				{ name: 'SE', value: 'SE' },
-				{ name: 'SP', value: 'SP' },
-				{ name: 'TO', value: 'TO' },
-			],
+			options: UF_OPTIONS_OPTIONAL,
 			displayOptions: {
 				show: {
 					resource: ['contratacao'],
@@ -738,15 +747,17 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 		},
 		{
-			displayName: 'Código do Município IBGE',
+			displayName: 'Município Name or ID',
 			name: 'codigoMunicipioIbge',
-			type: 'number',
+			type: 'options',
 			typeOptions: {
-				numberType: 'integer',
+				loadOptionsMethod: 'getCidades',
+				loadOptionsDependsOn: ['uf'],
 			},
-			default: 0,
+			default: '',
 			required: false,
-			description: 'Código IBGE do município (opcional)',
+			description:
+				'Selecione um município após escolher a UF. O código IBGE é enviado automaticamente para a API. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			displayOptions: {
 				show: {
 					resource: ['contratacao'],
@@ -873,17 +884,9 @@ export const pncpDescription: INodeTypeDescription = {
 			displayName: 'Modalidade de Contratação',
 			name: 'codigoModalidadeContratacao',
 			type: 'options',
-			default: '',
-			description: 'Selecione uma ou mais modalidades de contratação',
-			options: [
-				{ name: 'Concorrência', value: '1' },
-				{ name: 'Concurso', value: '2' },
-				{ name: 'Leilão', value: '3' },
-				{ name: 'Pregão', value: '4' },
-				{ name: 'Diálogo Competitivo', value: '5' },
-				{ name: 'Dispensa de Licitação', value: '6' },
-				{ name: 'Inexigibilidade', value: '7' },
-			],
+			default: '1',
+			description: 'Modalidade de contratação',
+			options: MODALIDADE_CONTRATACAO_OPTIONS,
 			displayOptions: {
 				show: {
 					resource: ['contratacao'],
@@ -893,21 +896,19 @@ export const pncpDescription: INodeTypeDescription = {
 			required: true,
 		},
 		{
-			displayName: 'Código do Modo de Disputa',
+			displayName: 'Modo de Disputa',
 			name: 'codigoModoDisputa',
-			type: 'number',
-			typeOptions: {
-				numberType: 'integer',
-			},
+			type: 'options',
+			options: MODO_DISPUTA_OPTIONS_OPTIONAL,
 			displayOptions: {
 				show: {
 					resource: ['contratacao'],
 					operation: ['consultarPorDataAtualizacao'],
 				},
 			},
-			default: 0,
+			default: '',
 			required: false,
-			description: 'Código do modo de disputa (opcional)',
+			description: 'Modo de disputa da contratação (opcional)',
 		},
 		{
 			displayName: 'UF',
@@ -916,35 +917,7 @@ export const pncpDescription: INodeTypeDescription = {
 			default: '',
 			required: false,
 			description: 'Sigla da UF (opcional)',
-			options: [
-				{ name: 'AC', value: 'AC' },
-				{ name: 'AL', value: 'AL' },
-				{ name: 'AM', value: 'AM' },
-				{ name: 'AP', value: 'AP' },
-				{ name: 'BA', value: 'BA' },
-				{ name: 'CE', value: 'CE' },
-				{ name: 'DF', value: 'DF' },
-				{ name: 'ES', value: 'ES' },
-				{ name: 'GO', value: 'GO' },
-				{ name: 'MA', value: 'MA' },
-				{ name: 'MG', value: 'MG' },
-				{ name: 'MS', value: 'MS' },
-				{ name: 'MT', value: 'MT' },
-				{ name: 'PA', value: 'PA' },
-				{ name: 'PB', value: 'PB' },
-				{ name: 'PE', value: 'PE' },
-				{ name: 'PI', value: 'PI' },
-				{ name: 'PR', value: 'PR' },
-				{ name: 'RJ', value: 'RJ' },
-				{ name: 'RN', value: 'RN' },
-				{ name: 'RO', value: 'RO' },
-				{ name: 'RR', value: 'RR' },
-				{ name: 'RS', value: 'RS' },
-				{ name: 'SC', value: 'SC' },
-				{ name: 'SE', value: 'SE' },
-				{ name: 'SP', value: 'SP' },
-				{ name: 'TO', value: 'TO' },
-			],
+			options: UF_OPTIONS_OPTIONAL,
 			displayOptions: {
 				show: {
 					resource: ['contratacao'],
@@ -953,15 +926,17 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 		},
 		{
-			displayName: 'Código do Município IBGE',
+			displayName: 'Município Name or ID',
 			name: 'codigoMunicipioIbge',
-			type: 'number',
+			type: 'options',
 			typeOptions: {
-				numberType: 'integer',
+				loadOptionsMethod: 'getCidades',
+				loadOptionsDependsOn: ['uf'],
 			},
-			default: 0,
+			default: '',
 			required: false,
-			description: 'Código IBGE do município (opcional)',
+			description:
+				'Selecione um município após escolher a UF. O código IBGE é enviado automaticamente para a API. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			displayOptions: {
 				show: {
 					resource: ['contratacao'],
@@ -1354,19 +1329,17 @@ export const pncpDescription: INodeTypeDescription = {
 		{
 			displayName: 'Tipo de Instrumento de Cobrança',
 			name: 'tipoInstrumentoCobranca',
-			type: 'number',
-			typeOptions: {
-				numberType: 'integer',
-			},
+			type: 'options',
+			options: TIPO_INSTRUMENTO_COBRANCA_OPTIONS_OPTIONAL,
 			displayOptions: {
 				show: {
 					resource: ['instrumentoCobranca'],
 					operation: ['consultarPorDataInclusao'],
 				},
 			},
-			default: 0,
+			default: '',
 			required: false,
-			description: 'Tipo de instrumento de cobrança (opcional)',
+			description: 'Tipo do instrumento de cobrança (opcional)',
 		},
 		{
 			displayName: 'CNPJ do Órgão',

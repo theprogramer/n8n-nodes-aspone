@@ -2,12 +2,36 @@ import type { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
 import {
 	INodeType,
 	INodeTypeDescription,
+  ILoadOptionsFunctions,
 	NodeOperationError,
 } from 'n8n-workflow';
 import { pncpDescription } from './descriptions/PncpDescription';
 
 export class Pncp implements INodeType {
 	description: INodeTypeDescription = pncpDescription;
+
+	methods = {
+		loadOptions: {
+			async getCidades(this: ILoadOptionsFunctions) {
+				// Entrada vazia permite limpar o filtro de município
+				const emptyOption = { name: '- Não Filtrar -', value: '' };
+
+				const uf = this.getCurrentNodeParameter('uf') as string;
+				if (!uf) return [emptyOption];
+
+				const response = (await this.helpers.httpRequest({
+					method: 'GET',
+					url: `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf}/municipios`,
+				})) as Array<{ nome: string; id: number }>;
+
+				const cidades = response
+					.map((cidade) => ({ name: cidade.nome, value: cidade.id }))
+					.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+
+				return [emptyOption, ...cidades];
+			},
+		},
+	};
 
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const returnData: INodeExecutionData[] = [];
@@ -17,7 +41,7 @@ export class Pncp implements INodeType {
 		const credentials = await this.getCredentials('pncpCredential');
 		const baseUrl = credentials.baseUrl as string;
 
-		let options = {
+		const options = {
 			baseURL: baseUrl,
 			headers: {
 				'Content-Type': 'application/json',
@@ -61,7 +85,7 @@ export class Pncp implements INodeType {
 						tamanhoPagina: this.getNodeParameter('tamanhoPagina', 0) as number,
 					};
 				} else if (operation === 'consultarItensPorAno') {
-					endpoint = '/v1/pca/';
+					endpoint = '/v1/pca';
 					qs = {
 						anoPca: this.getNodeParameter('anoPca', 0) as number,
 						codigoClassificacaoSuperior: this.getNodeParameter('codigoClassificacaoSuperior', 0) as string,
@@ -82,9 +106,9 @@ export class Pncp implements INodeType {
 					qs = {
 						dataInicial: formatDateToYYYYMMDD(this.getNodeParameter('dataInicial', 0) as string),
 						dataFinal: formatDateToYYYYMMDD(this.getNodeParameter('dataFinal', 0) as string),
-						codigoModoDisputa: this.getNodeParameter('codigoModoDisputa', 0) as number,
+						codigoModoDisputa: this.getNodeParameter('codigoModoDisputa', 0) as number | string,
 						uf: this.getNodeParameter('uf', 0) as string,
-						codigoMunicipioIbge: this.getNodeParameter('codigoMunicipioIbge', 0) as number,
+						codigoMunicipioIbge: this.getNodeParameter('codigoMunicipioIbge', 0) as string | number,
 						cnpj: this.getNodeParameter('cnpj', 0) as string,
 						codigoUnidadeAdministrativa: this.getNodeParameter('codigoUnidadeAdministrativa', 0) as string,
 						idUsuario: this.getNodeParameter('idUsuario', 0) as number,
@@ -100,7 +124,7 @@ export class Pncp implements INodeType {
 					qs = {
 						dataFinal: formatDateToYYYYMMDD(this.getNodeParameter('dataFinal', 0) as string),
 						uf: this.getNodeParameter('uf', 0) as string,
-						codigoMunicipioIbge: this.getNodeParameter('codigoMunicipioIbge', 0) as number,
+						codigoMunicipioIbge: this.getNodeParameter('codigoMunicipioIbge', 0) as string | number,
 						cnpj: this.getNodeParameter('cnpj', 0) as string,
 						codigoUnidadeAdministrativa: this.getNodeParameter('codigoUnidadeAdministrativa', 0) as string,
 						idUsuario: this.getNodeParameter('idUsuario', 0) as number,
@@ -116,9 +140,9 @@ export class Pncp implements INodeType {
 					qs = {
 						dataInicial: formatDateToYYYYMMDD(this.getNodeParameter('dataInicial', 0) as string),
 						dataFinal: formatDateToYYYYMMDD(this.getNodeParameter('dataFinal', 0) as string),
-						codigoModoDisputa: this.getNodeParameter('codigoModoDisputa', 0) as number,
+						codigoModoDisputa: this.getNodeParameter('codigoModoDisputa', 0) as number | string,
 						uf: this.getNodeParameter('uf', 0) as string,
-						codigoMunicipioIbge: this.getNodeParameter('codigoMunicipioIbge', 0) as number,
+						codigoMunicipioIbge: this.getNodeParameter('codigoMunicipioIbge', 0) as string | number,
 						cnpj: this.getNodeParameter('cnpj', 0) as string,
 						codigoUnidadeAdministrativa: this.getNodeParameter('codigoUnidadeAdministrativa', 0) as string,
 						idUsuario: this.getNodeParameter('idUsuario', 0) as number,
@@ -159,7 +183,7 @@ export class Pncp implements INodeType {
 					qs = {
 						dataInicial: formatDateToYYYYMMDD(this.getNodeParameter('dataInicial', 0) as string),
 						dataFinal: formatDateToYYYYMMDD(this.getNodeParameter('dataFinal', 0) as string),
-						tipoInstrumentoCobranca: this.getNodeParameter('tipoInstrumentoCobranca', 0) as number,
+						tipoInstrumentoCobranca: this.getNodeParameter('tipoInstrumentoCobranca', 0) as number | string,
 						cnpjOrgao: this.getNodeParameter('cnpjOrgao', 0) as string,
 						pagina: this.getNodeParameter('pagina', 0) as number,
 						tamanhoPagina: this.getNodeParameter('tamanhoPagina', 0) as number,
@@ -191,7 +215,7 @@ export class Pncp implements INodeType {
 				}
 			}
 
-			// Remove chaves undefined, vazias ou 0 de parâmetros opcionais
+			// Remove keys that are undefined, empty string, or 0 (optional fields not filled)
 			Object.keys(qs).forEach((key) => {
 				const value = qs[key];
 				if (value === undefined || value === '' || value === 0) {
@@ -206,7 +230,7 @@ export class Pncp implements INodeType {
 			});
 
 			returnData.push({
-				json: response.data,
+				json: response,
 				pairedItem: {
 					item: 0,
 				},
