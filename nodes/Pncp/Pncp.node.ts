@@ -1,14 +1,38 @@
-import type { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
+import type {
+	IExecuteFunctions,
+	INodeExecutionData,
+	NodeConnectionType,
+} from 'n8n-workflow';
 import {
 	INodeType,
 	INodeTypeDescription,
-  ILoadOptionsFunctions,
+	ILoadOptionsFunctions,
 	NodeOperationError,
 } from 'n8n-workflow';
-import { pncpDescription } from './descriptions/PncpDescription';
+import { pncpProperties } from './descriptions/PncpDescription';
 
 export class Pncp implements INodeType {
-	description: INodeTypeDescription = pncpDescription;
+	description: INodeTypeDescription = {
+		displayName: 'PNCP',
+		name: 'pncp',
+		icon: 'file:pncp.svg',
+		group: ['transform'],
+		version: 1,
+		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
+		description: 'Interage com a API do Portal Nacional de Contratações Públicas (PNCP)',
+		defaults: {
+			name: 'PNCP',
+		},
+		inputs: ['main'] as [NodeConnectionType],
+		outputs: ['main'] as [NodeConnectionType],
+		credentials: [
+			{
+				name: 'pncpApi',
+				required: true,
+			},
+		],
+		properties: pncpProperties,
+	};
 
 	methods = {
 		loadOptions: {
@@ -38,7 +62,7 @@ export class Pncp implements INodeType {
 		const resource = this.getNodeParameter('resource', 0) as string;
 		const operation = this.getNodeParameter('operation', 0) as string;
 
-		const credentials = await this.getCredentials('pncpCredential');
+		const credentials = await this.getCredentials('pncpApi');
 		const baseUrl = credentials.baseUrl as string;
 
 		const options = {
@@ -223,7 +247,7 @@ export class Pncp implements INodeType {
 				}
 			});
 
-			const response = await this.helpers.httpRequestWithAuthentication.call(this, 'pncpCredential', {
+			const response = await this.helpers.httpRequestWithAuthentication.call(this, 'pncpApi', {
 				...options,
 				url: endpoint,
 				qs,

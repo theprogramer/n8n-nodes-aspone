@@ -1,4 +1,10 @@
-import { INodePropertyOptions, INodeTypeDescription, NodeConnectionType } from 'n8n-workflow';
+/* eslint-disable n8n-nodes-base/node-param-operation-option-action-miscased */
+// Regra desabilitada: a lib `sentence-case` usada pelo plugin trata caracteres
+// acentuados como separadores, impedindo que qualquer `action` em português
+// com acentuação passe na verificação. Mantemos os textos corretamente
+// acentuados para preservar a experiência em pt-BR.
+
+import { INodeProperties, INodePropertyOptions } from 'n8n-workflow';
 
 // Entrada inerte usada em selects de campos opcionais para permitir "não filtrar"
 const NONE_OPTION: INodePropertyOptions = { name: '- Não Filtrar -', value: '' };
@@ -15,14 +21,14 @@ const UF_OPTIONS = [
 	{ name: 'Goiás (GO)', value: 'GO' },
 	{ name: 'Maranhão (MA)', value: 'MA' },
 	{ name: 'Mato Grosso (MT)', value: 'MT' },
-	{ name: 'Mato Grosso do Sul (MS)', value: 'MS' },
+	{ name: 'Mato Grosso Do Sul (MS)', value: 'MS' },
 	{ name: 'Minas Gerais (MG)', value: 'MG' },
 	{ name: 'Pará (PA)', value: 'PA' },
 	{ name: 'Paraíba (PB)', value: 'PB' },
 	{ name: 'Paraná (PR)', value: 'PR' },
 	{ name: 'Pernambuco (PE)', value: 'PE' },
 	{ name: 'Piauí (PI)', value: 'PI' },
-	{ name: 'Rio de Janeiro (RJ)', value: 'RJ' },
+	{ name: 'Rio De Janeiro (RJ)', value: 'RJ' },
 	{ name: 'Rio Grande Do Norte (RN)', value: 'RN' },
 	{ name: 'Rio Grande Do Sul (RS)', value: 'RS' },
 	{ name: 'Rondônia (RO)', value: 'RO' },
@@ -42,13 +48,13 @@ const MODALIDADE_CONTRATACAO_OPTIONS = [
 	{ name: 'Concorrência - Presencial', value: '5' },
 	{ name: 'Pregão - Eletrônico', value: '6' },
 	{ name: 'Pregão - Presencial', value: '7' },
-	{ name: 'Dispensa de Licitação', value: '8' },
+	{ name: 'Dispensa De Licitação', value: '8' },
 	{ name: 'Inexigibilidade', value: '9' },
-	{ name: 'Manifestação de Interesse', value: '10' },
+	{ name: 'Manifestação De Interesse', value: '10' },
 	{ name: 'Pré-Qualificação', value: '11' },
 	{ name: 'Credenciamento', value: '12' },
 	{ name: 'Leilão - Presencial', value: '13' },
-	{ name: 'Inaplicabilidade da Licitação', value: '14' },
+	{ name: 'Inaplicabilidade Da Licitação', value: '14' },
 ];
 
 const MODO_DISPUTA_OPTIONS = [
@@ -63,7 +69,7 @@ const MODO_DISPUTA_OPTIONS = [
 const TIPO_INSTRUMENTO_COBRANCA_OPTIONS = [
 	{ name: 'Nota Fiscal Eletrônica', value: 1 },
 	{ name: 'Nota Fiscal Avulsa', value: 2 },
-	{ name: 'Nota Fiscal de Serviços Eletrônica (NFS-E)', value: 3 },
+	{ name: 'Nota Fiscal De Serviços Eletrônica (NFS-E)', value: 3 },
 	{ name: 'Fatura', value: 4 },
 	{ name: 'Recibo', value: 5 },
 	{ name: 'Outros', value: 6 },
@@ -81,56 +87,38 @@ const TIPO_INSTRUMENTO_COBRANCA_OPTIONS_OPTIONAL: INodePropertyOptions[] = [
 	...TIPO_INSTRUMENTO_COBRANCA_OPTIONS,
 ];
 
-export const pncpDescription: INodeTypeDescription = {
-	displayName: 'PNCP',
-	name: 'pncp',
-	icon: 'file:../../../icons/pncp.png',
-	group: ['transform'],
-	version: 1,
-	description: 'Interage com a API do Portal Nacional de Contratações Públicas (PNCP)',
-	defaults: {
-		name: 'PNCP',
+export const pncpProperties: INodeProperties[] = [
+	{
+		displayName: 'Recurso',
+		name: 'resource',
+		type: 'options',
+		noDataExpression: true,
+		options: [
+			{
+				name: 'Ata De Registro De Preço',
+				value: 'ata',
+			},
+			{
+				name: 'Contratação',
+				value: 'contratacao',
+			},
+			{
+				name: 'Contrato/Empenho',
+				value: 'contrato',
+			},
+			{
+				name: 'Instrumento De Cobrança',
+				value: 'instrumentoCobranca',
+			},
+			{
+				name: 'Plano De Contratação',
+				value: 'planoContratacao',
+			},
+		],
+		default: 'planoContratacao',
+		required: true,
+		description: 'O recurso para operar',
 	},
-	inputs: ['main'] as [NodeConnectionType],
-	outputs: ['main'] as [NodeConnectionType],
-	credentials: [
-		{
-			name: 'pncpCredential',
-			required: true,
-		},
-	],
-	properties: [
-		{
-			displayName: 'Recurso',
-			name: 'resource',
-			type: 'options',
-			noDataExpression: true,
-			options: [
-				{
-					name: 'Plano de Contratação',
-					value: 'planoContratacao',
-				},
-				{
-					name: 'Contratação',
-					value: 'contratacao',
-				},
-				{
-					name: 'Contrato/Empenho',
-					value: 'contrato',
-				},
-				{
-					name: 'Instrumento de Cobrança',
-					value: 'instrumentoCobranca',
-				},
-				{
-					name: 'Ata de Registro de Preços',
-					value: 'ata',
-				},
-			],
-			default: 'planoContratacao',
-			required: true,
-			description: 'O recurso para operar',
-		},
 		{
 			displayName: 'Operação',
 			name: 'operation',
@@ -143,19 +131,22 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 			options: [
 				{
-					name: 'Consultar Itens por Usuário e Ano',
+					name: 'Consultar Itens Por Usuário E Ano',
 					value: 'consultarItensPorUsuarioAno',
 					description: 'Consultar Itens de PCA por Ano do PCA, IdUsuario e Código de Classificação Superior',
+					action: 'Consultar itens de PCA por usuário e ano',
 				},
 				{
-					name: 'Consultar por Data de Atualização',
+					name: 'Consultar Por Data De Atualização',
 					value: 'consultarPorDataAtualizacao',
 					description: 'Consultar PCA por Data de Atualização Global',
+					action: 'Consultar PCA por data de atualização',
 				},
 				{
-					name: 'Consultar Itens por Ano',
+					name: 'Consultar Itens Por Ano',
 					value: 'consultarItensPorAno',
 					description: 'Consultar Itens de PCA por Ano do PCA e Código de Classificação Superior',
+					action: 'Consultar itens de PCA por ano',
 				},
 			],
 			default: 'consultarItensPorUsuarioAno',
@@ -164,7 +155,7 @@ export const pncpDescription: INodeTypeDescription = {
 		},
 		// Parâmetros para planoContratacao - consultarItensPorUsuarioAno
 		{
-			displayName: 'Ano do PCA',
+			displayName: 'Ano Do PCA',
 			name: 'anoPca',
 			type: 'number',
 			typeOptions: {
@@ -183,7 +174,7 @@ export const pncpDescription: INodeTypeDescription = {
 			description: 'Ano do Plano de Contratação Anual',
 		},
 		{
-			displayName: 'ID do Usuário',
+			displayName: 'ID Do Usuário',
 			name: 'idUsuario',
 			type: 'number',
 			typeOptions: {
@@ -198,7 +189,6 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 			default: 1,
 			required: true,
-			description: 'ID do usuário',
 		},
 		{
 			displayName: 'Código de Classificação Superior',
@@ -211,7 +201,6 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: '',
-			required: false,
 			description: 'Código de classificação superior (opcional)',
 		},
 		{
@@ -225,7 +214,6 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: '',
-			required: false,
 			description: 'CNPJ do órgão (opcional)',
 		},
 		{
@@ -247,7 +235,7 @@ export const pncpDescription: INodeTypeDescription = {
 			description: 'Número da página (mínimo 1)',
 		},
 		{
-			displayName: 'Tamanho da Página',
+			displayName: 'Tamanho Da Página',
 			name: 'tamanhoPagina',
 			type: 'number',
 			typeOptions: {
@@ -262,7 +250,6 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: 10,
-			required: false,
 			description: 'Número de itens por página (10-500)',
 		},
 		// Parâmetros para planoContratacao - consultarPorDataAtualizacao
@@ -305,11 +292,10 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: '',
-			required: false,
 			description: 'CNPJ do órgão (opcional)',
 		},
 		{
-			displayName: 'Código da Unidade',
+			displayName: 'Código Da Unidade',
 			name: 'codigoUnidade',
 			type: 'string',
 			displayOptions: {
@@ -319,7 +305,6 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: '',
-			required: false,
 			description: 'Código da unidade administrativa (opcional)',
 		},
 		{
@@ -341,7 +326,7 @@ export const pncpDescription: INodeTypeDescription = {
 			description: 'Número da página (mínimo 1)',
 		},
 		{
-			displayName: 'Tamanho da Página',
+			displayName: 'Tamanho Da Página',
 			name: 'tamanhoPagina',
 			type: 'number',
 			typeOptions: {
@@ -356,12 +341,11 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: 10,
-			required: false,
 			description: 'Número de itens por página (10-500)',
 		},
 		// Parâmetros para planoContratacao - consultarItensPorAno
 		{
-			displayName: 'Ano do PCA',
+			displayName: 'Ano Do PCA',
 			name: 'anoPca',
 			type: 'number',
 			typeOptions: {
@@ -395,7 +379,6 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 			default: '',
 			required: true,
-			description: 'Código de classificação superior',
 		},
 		{
 			displayName: 'Página',
@@ -416,7 +399,7 @@ export const pncpDescription: INodeTypeDescription = {
 			description: 'Número da página (mínimo 1)',
 		},
 		{
-			displayName: 'Tamanho da Página',
+			displayName: 'Tamanho Da Página',
 			name: 'tamanhoPagina',
 			type: 'number',
 			typeOptions: {
@@ -431,7 +414,6 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: 10,
-			required: false,
 			description: 'Número de itens por página (10-500)',
 		},
 		// Operações para contratacao
@@ -447,24 +429,28 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 			options: [
 				{
-					name: 'Consultar por ID',
+					name: 'Consultar Por ID',
 					value: 'consultarPorId',
 					description: 'Consultar Contratação por CNPJ, Ano e Sequencial',
+					action: 'Consultar contratação por ID',
 				},
 				{
-					name: 'Consultar por Data de Publicação',
+					name: 'Consultar Por Data De Publicação',
 					value: 'consultarPorDataPublicacao',
 					description: 'Consultar Contratações por Data de Publicação',
+					action: 'Consultar contratações por data de publicação',
 				},
 				{
-					name: 'Consultar por Período de Propostas',
+					name: 'Consultar Por Período De Propostas',
 					value: 'consultarPorPeriodoPropostas',
 					description: 'Consultar Contratações com Recebimento de Propostas Aberto',
+					action: 'Consultar contratações com propostas abertas',
 				},
 				{
-					name: 'Consultar por Data de Atualização',
+					name: 'Consultar Por Data De Atualização',
 					value: 'consultarPorDataAtualizacao',
 					description: 'Consultar Contratações por Data de Atualização Global',
+					action: 'Consultar contratações por data de atualização',
 				},
 			],
 			default: 'consultarPorId',
@@ -473,7 +459,7 @@ export const pncpDescription: INodeTypeDescription = {
 		},
 		// Parâmetros para contratacao - consultarPorId
 		{
-			displayName: 'CNPJ do Órgão',
+			displayName: 'CNPJ Do Órgão',
 			name: 'cnpj',
 			type: 'string',
 			typeOptions: {
@@ -490,7 +476,7 @@ export const pncpDescription: INodeTypeDescription = {
 			description: 'CNPJ do órgão (formato brasileiro)',
 		},
 		{
-			displayName: 'Ano da Compra',
+			displayName: 'Ano Da Compra',
 			name: 'ano',
 			type: 'number',
 			typeOptions: {
@@ -506,10 +492,9 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 			default: 2024,
 			required: true,
-			description: 'Ano da compra',
 		},
 		{
-			displayName: 'Sequencial da Compra',
+			displayName: 'Sequencial Da Compra',
 			name: 'sequencial',
 			type: 'number',
 			typeOptions: {
@@ -539,7 +524,6 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 			default: '',
 			required: true,
-			description: 'Data inicial',
 		},
 		{
 			displayName: 'Data Final',
@@ -553,14 +537,12 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 			default: '',
 			required: true,
-			description: 'Data final',
 		},
 		{
-			displayName: 'Modalidade de Contratação',
+			displayName: 'Modalidade De Contratação',
 			name: 'codigoModalidadeContratacao',
 			type: 'options',
 			default: '1',
-			description: 'Modalidade de contratação',
 			options: MODALIDADE_CONTRATACAO_OPTIONS,
 			displayOptions: {
 				show: {
@@ -571,7 +553,7 @@ export const pncpDescription: INodeTypeDescription = {
 			required: true,
 		},
 		{
-			displayName: 'Modo de Disputa',
+			displayName: 'Modo De Disputa',
 			name: 'codigoModoDisputa',
 			type: 'options',
 			options: MODO_DISPUTA_OPTIONS_OPTIONAL,
@@ -582,7 +564,6 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: '',
-			required: false,
 			description: 'Modo de disputa da contratação (opcional)',
 		},
 		{
@@ -590,7 +571,6 @@ export const pncpDescription: INodeTypeDescription = {
 			name: 'uf',
 			type: 'options',
 			default: '',
-			required: false,
 			description: 'Sigla da UF (opcional)',
 			options: UF_OPTIONS_OPTIONAL,
 			displayOptions: {
@@ -609,7 +589,6 @@ export const pncpDescription: INodeTypeDescription = {
 				loadOptionsDependsOn: ['uf'],
 			},
 			default: '',
-			required: false,
 			description:
 				'Selecione um município após escolher a UF. O código IBGE é enviado automaticamente para a API. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			displayOptions: {
@@ -630,11 +609,10 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: '',
-			required: false,
 			description: 'CNPJ (opcional)',
 		},
 		{
-			displayName: 'Código da Unidade Administrativa',
+			displayName: 'Código Da Unidade Administrativa',
 			name: 'codigoUnidadeAdministrativa',
 			type: 'string',
 			displayOptions: {
@@ -644,11 +622,10 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: '',
-			required: false,
 			description: 'Código da unidade administrativa (opcional)',
 		},
 		{
-			displayName: 'ID do Usuário',
+			displayName: 'ID Do Usuário',
 			name: 'idUsuario',
 			type: 'number',
 			typeOptions: {
@@ -661,7 +638,6 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: 0,
-			required: false,
 			description: 'ID do usuário (opcional)',
 		},
 		{
@@ -683,7 +659,7 @@ export const pncpDescription: INodeTypeDescription = {
 			description: 'Número da página (mínimo 1)',
 		},
 		{
-			displayName: 'Tamanho da Página',
+			displayName: 'Tamanho Da Página',
 			name: 'tamanhoPagina',
 			type: 'number',
 			typeOptions: {
@@ -698,7 +674,6 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: 10,
-			required: false,
 			description: 'Número de itens por página (10-50)',
 		},
 		// Parâmetros para contratacao - consultarPorPeriodoPropostas
@@ -714,10 +689,9 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 			default: '',
 			required: true,
-			description: 'Data final',
 		},
 		{
-			displayName: 'Modalidade de Contratação',
+			displayName: 'Modalidade De Contratação',
 			name: 'codigoModalidadeContratacao',
 			type: 'options',
 			default: '',
@@ -729,14 +703,12 @@ export const pncpDescription: INodeTypeDescription = {
 					operation: ['consultarPorPeriodoPropostas'],
 				},
 			},
-			required: false,
 		},
 		{
 			displayName: 'UF',
 			name: 'uf',
 			type: 'options',
 			default: '',
-			required: false,
 			description: 'Sigla da UF (opcional)',
 			options: UF_OPTIONS_OPTIONAL,
 			displayOptions: {
@@ -755,7 +727,6 @@ export const pncpDescription: INodeTypeDescription = {
 				loadOptionsDependsOn: ['uf'],
 			},
 			default: '',
-			required: false,
 			description:
 				'Selecione um município após escolher a UF. O código IBGE é enviado automaticamente para a API. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			displayOptions: {
@@ -776,11 +747,10 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: '',
-			required: false,
 			description: 'CNPJ (opcional)',
 		},
 		{
-			displayName: 'Código da Unidade Administrativa',
+			displayName: 'Código Da Unidade Administrativa',
 			name: 'codigoUnidadeAdministrativa',
 			type: 'string',
 			typeOptions: {
@@ -794,11 +764,10 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: '',
-			required: false,
 			description: 'Código da unidade administrativa (opcional)',
 		},
 		{
-			displayName: 'ID do Usuário',
+			displayName: 'ID Do Usuário',
 			name: 'idUsuario',
 			type: 'number',
 			typeOptions: {
@@ -811,7 +780,6 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: 0,
-			required: false,
 			description: 'ID do usuário (opcional)',
 		},
 		{
@@ -833,7 +801,7 @@ export const pncpDescription: INodeTypeDescription = {
 			description: 'Número da página (mínimo 1)',
 		},
 		{
-			displayName: 'Tamanho da Página',
+			displayName: 'Tamanho Da Página',
 			name: 'tamanhoPagina',
 			type: 'number',
 			typeOptions: {
@@ -848,7 +816,6 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: 10,
-			required: false,
 			description: 'Número de itens por página (10-50)',
 		},
 		// Parâmetros para contratacao - consultarPorDataAtualizacao (mesmo que porDataPublicacao)
@@ -864,7 +831,6 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 			default: '',
 			required: true,
-			description: 'Data inicial',
 		},
 		{
 			displayName: 'Data Final',
@@ -878,14 +844,12 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 			default: '',
 			required: true,
-			description: 'Data final',
 		},
 		{
-			displayName: 'Modalidade de Contratação',
+			displayName: 'Modalidade De Contratação',
 			name: 'codigoModalidadeContratacao',
 			type: 'options',
 			default: '1',
-			description: 'Modalidade de contratação',
 			options: MODALIDADE_CONTRATACAO_OPTIONS,
 			displayOptions: {
 				show: {
@@ -896,7 +860,7 @@ export const pncpDescription: INodeTypeDescription = {
 			required: true,
 		},
 		{
-			displayName: 'Modo de Disputa',
+			displayName: 'Modo De Disputa',
 			name: 'codigoModoDisputa',
 			type: 'options',
 			options: MODO_DISPUTA_OPTIONS_OPTIONAL,
@@ -907,7 +871,6 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: '',
-			required: false,
 			description: 'Modo de disputa da contratação (opcional)',
 		},
 		{
@@ -915,7 +878,6 @@ export const pncpDescription: INodeTypeDescription = {
 			name: 'uf',
 			type: 'options',
 			default: '',
-			required: false,
 			description: 'Sigla da UF (opcional)',
 			options: UF_OPTIONS_OPTIONAL,
 			displayOptions: {
@@ -934,7 +896,6 @@ export const pncpDescription: INodeTypeDescription = {
 				loadOptionsDependsOn: ['uf'],
 			},
 			default: '',
-			required: false,
 			description:
 				'Selecione um município após escolher a UF. O código IBGE é enviado automaticamente para a API. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			displayOptions: {
@@ -955,11 +916,10 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: '',
-			required: false,
 			description: 'CNPJ (opcional)',
 		},
 		{
-			displayName: 'Código da Unidade Administrativa',
+			displayName: 'Código Da Unidade Administrativa',
 			name: 'codigoUnidadeAdministrativa',
 			type: 'string',
 			displayOptions: {
@@ -969,11 +929,10 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: '',
-			required: false,
 			description: 'Código da unidade administrativa (opcional)',
 		},
 		{
-			displayName: 'ID do Usuário',
+			displayName: 'ID Do Usuário',
 			name: 'idUsuario',
 			type: 'number',
 			typeOptions: {
@@ -986,7 +945,6 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: 0,
-			required: false,
 			description: 'ID do usuário (opcional)',
 		},
 		{
@@ -1008,7 +966,7 @@ export const pncpDescription: INodeTypeDescription = {
 			description: 'Número da página (mínimo 1)',
 		},
 		{
-			displayName: 'Tamanho da Página',
+			displayName: 'Tamanho Da Página',
 			name: 'tamanhoPagina',
 			type: 'number',
 			typeOptions: {
@@ -1023,7 +981,6 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: 10,
-			required: false,
 			description: 'Número de itens por página (10-50)',
 		},
 		// Operações para contrato
@@ -1039,14 +996,16 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 			options: [
 				{
-					name: 'Consultar por Data de Publicação',
+					name: 'Consultar Por Data De Publicação',
 					value: 'consultarPorDataPublicacao',
 					description: 'Consultar Contratos por Data de Publicação',
+					action: 'Consultar contratos por data de publicação',
 				},
 				{
-					name: 'Consultar por Data de Atualização',
+					name: 'Consultar Por Data De Atualização',
 					value: 'consultarPorDataAtualizacao',
 					description: 'Consultar Contratos/Empenhos por Data de Atualização Global',
+					action: 'Consultar contratos por data de atualização',
 				},
 			],
 			default: 'consultarPorDataPublicacao',
@@ -1066,7 +1025,6 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 			default: '',
 			required: true,
-			description: 'Data inicial',
 		},
 		{
 			displayName: 'Data Final',
@@ -1080,10 +1038,9 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 			default: '',
 			required: true,
-			description: 'Data final',
 		},
 		{
-			displayName: 'CNPJ do Órgão',
+			displayName: 'CNPJ Do Órgão',
 			name: 'cnpjOrgao',
 			type: 'string',
 			displayOptions: {
@@ -1093,11 +1050,10 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: '',
-			required: false,
 			description: 'CNPJ do órgão (opcional)',
 		},
 		{
-			displayName: 'Código da Unidade Administrativa',
+			displayName: 'Código Da Unidade Administrativa',
 			name: 'codigoUnidadeAdministrativa',
 			type: 'string',
 			displayOptions: {
@@ -1107,11 +1063,10 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: '',
-			required: false,
 			description: 'Código da unidade administrativa (opcional)',
 		},
 		{
-			displayName: 'ID do Usuário',
+			displayName: 'ID Do Usuário',
 			name: 'usuarioId',
 			type: 'number',
 			typeOptions: {
@@ -1124,7 +1079,6 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: 0,
-			required: false,
 			description: 'ID do usuário (opcional)',
 		},
 		{
@@ -1146,7 +1100,7 @@ export const pncpDescription: INodeTypeDescription = {
 			description: 'Número da página (mínimo 1)',
 		},
 		{
-			displayName: 'Tamanho da Página',
+			displayName: 'Tamanho Da Página',
 			name: 'tamanhoPagina',
 			type: 'number',
 			typeOptions: {
@@ -1161,7 +1115,6 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: 10,
-			required: false,
 			description: 'Número de itens por página (10-500)',
 		},
 		// Parâmetros para contrato - consultarPorDataAtualizacao (mesmo que acima)
@@ -1177,7 +1130,6 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 			default: '',
 			required: true,
-			description: 'Data inicial',
 		},
 		{
 			displayName: 'Data Final',
@@ -1191,10 +1143,9 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 			default: '',
 			required: true,
-			description: 'Data final',
 		},
 		{
-			displayName: 'CNPJ do Órgão',
+			displayName: 'CNPJ Do Órgão',
 			name: 'cnpjOrgao',
 			type: 'string',
 			displayOptions: {
@@ -1204,11 +1155,10 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: '',
-			required: false,
 			description: 'CNPJ do órgão (opcional)',
 		},
 		{
-			displayName: 'Código da Unidade Administrativa',
+			displayName: 'Código Da Unidade Administrativa',
 			name: 'codigoUnidadeAdministrativa',
 			type: 'string',
 			displayOptions: {
@@ -1218,11 +1168,10 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: '',
-			required: false,
 			description: 'Código da unidade administrativa (opcional)',
 		},
 		{
-			displayName: 'ID do Usuário',
+			displayName: 'ID Do Usuário',
 			name: 'usuarioId',
 			type: 'number',
 			typeOptions: {
@@ -1235,7 +1184,6 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: 0,
-			required: false,
 			description: 'ID do usuário (opcional)',
 		},
 		{
@@ -1257,7 +1205,7 @@ export const pncpDescription: INodeTypeDescription = {
 			description: 'Número da página (mínimo 1)',
 		},
 		{
-			displayName: 'Tamanho da Página',
+			displayName: 'Tamanho Da Página',
 			name: 'tamanhoPagina',
 			type: 'number',
 			typeOptions: {
@@ -1272,7 +1220,6 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: 10,
-			required: false,
 			description: 'Número de itens por página (10-500)',
 		},
 		// Operações para instrumentoCobranca
@@ -1288,9 +1235,10 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 			options: [
 				{
-					name: 'Consultar por Data de Inclusão',
+					name: 'Consultar Por Data De Inclusão',
 					value: 'consultarPorDataInclusao',
 					description: 'Consultar Instrumentos de Cobrança por Data de Inclusão',
+					action: 'Consultar instrumentos de cobrança por data de inclusão',
 				},
 			],
 			default: 'consultarPorDataInclusao',
@@ -1310,7 +1258,6 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 			default: '',
 			required: true,
-			description: 'Data inicial',
 		},
 		{
 			displayName: 'Data Final',
@@ -1324,10 +1271,9 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 			default: '',
 			required: true,
-			description: 'Data final',
 		},
 		{
-			displayName: 'Tipo de Instrumento de Cobrança',
+			displayName: 'Tipo De Instrumento De Cobrança',
 			name: 'tipoInstrumentoCobranca',
 			type: 'options',
 			options: TIPO_INSTRUMENTO_COBRANCA_OPTIONS_OPTIONAL,
@@ -1338,11 +1284,10 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: '',
-			required: false,
 			description: 'Tipo do instrumento de cobrança (opcional)',
 		},
 		{
-			displayName: 'CNPJ do Órgão',
+			displayName: 'CNPJ Do Órgão',
 			name: 'cnpjOrgao',
 			type: 'string',
 			displayOptions: {
@@ -1352,7 +1297,6 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: '',
-			required: false,
 			description: 'CNPJ do órgão (opcional)',
 		},
 		{
@@ -1374,7 +1318,7 @@ export const pncpDescription: INodeTypeDescription = {
 			description: 'Número da página (mínimo 1)',
 		},
 		{
-			displayName: 'Tamanho da Página',
+			displayName: 'Tamanho Da Página',
 			name: 'tamanhoPagina',
 			type: 'number',
 			typeOptions: {
@@ -1389,7 +1333,6 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: 10,
-			required: false,
 			description: 'Número de itens por página (10-100)',
 		},
 		// Operações para ata
@@ -1405,14 +1348,16 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 			options: [
 				{
-					name: 'Consultar por Período de Vigência',
+					name: 'Consultar Por Período De Vigência',
 					value: 'consultarPorPeriodoVigencia',
 					description: 'Consultar Ata de Registro de Preço por Período de Vigência',
+					action: 'Consultar atas de registro de preço por período de vigência',
 				},
 				{
-					name: 'Consultar por Data de Atualização',
+					name: 'Consultar Por Data De Atualização',
 					value: 'consultarPorDataAtualizacao',
 					description: 'Consultar Atas de Registro de Preço por Data de Atualização Global',
+					action: 'Consultar atas de registro de preço por data de atualização',
 				},
 			],
 			default: 'consultarPorPeriodoVigencia',
@@ -1432,7 +1377,6 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 			default: '',
 			required: true,
-			description: 'Data inicial',
 		},
 		{
 			displayName: 'Data Final',
@@ -1446,10 +1390,9 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 			default: '',
 			required: true,
-			description: 'Data final',
 		},
 		{
-			displayName: 'ID do Usuário',
+			displayName: 'ID Do Usuário',
 			name: 'idUsuario',
 			type: 'number',
 			typeOptions: {
@@ -1462,7 +1405,6 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: 0,
-			required: false,
 			description: 'ID do usuário (opcional)',
 		},
 		{
@@ -1476,11 +1418,10 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: '',
-			required: false,
 			description: 'CNPJ (opcional)',
 		},
 		{
-			displayName: 'Código da Unidade Administrativa',
+			displayName: 'Código Da Unidade Administrativa',
 			name: 'codigoUnidadeAdministrativa',
 			type: 'string',
 			typeOptions: {
@@ -1494,7 +1435,6 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: '',
-			required: false,
 			description: 'Código da unidade administrativa (opcional)',
 		},
 		{
@@ -1516,7 +1456,7 @@ export const pncpDescription: INodeTypeDescription = {
 			description: 'Número da página (mínimo 1)',
 		},
 		{
-			displayName: 'Tamanho da Página',
+			displayName: 'Tamanho Da Página',
 			name: 'tamanhoPagina',
 			type: 'number',
 			typeOptions: {
@@ -1531,7 +1471,6 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: 10,
-			required: false,
 			description: 'Número de itens por página (10-500)',
 		},
 		// Parâmetros para ata - consultarPorDataAtualizacao (mesmo que acima)
@@ -1547,7 +1486,6 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 			default: '',
 			required: true,
-			description: 'Data inicial',
 		},
 		{
 			displayName: 'Data Final',
@@ -1561,10 +1499,9 @@ export const pncpDescription: INodeTypeDescription = {
 			},
 			default: '',
 			required: true,
-			description: 'Data final',
 		},
 		{
-			displayName: 'ID do Usuário',
+			displayName: 'ID Do Usuário',
 			name: 'idUsuario',
 			type: 'number',
 			typeOptions: {
@@ -1577,7 +1514,6 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: 0,
-			required: false,
 			description: 'ID do usuário (opcional)',
 		},
 		{
@@ -1591,11 +1527,10 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: '',
-			required: false,
 			description: 'CNPJ (opcional)',
 		},
 		{
-			displayName: 'Código da Unidade Administrativa',
+			displayName: 'Código Da Unidade Administrativa',
 			name: 'codigoUnidadeAdministrativa',
 			type: 'string',
 			typeOptions: {
@@ -1609,7 +1544,6 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: '',
-			required: false,
 			description: 'Código da unidade administrativa (opcional)',
 		},
 		{
@@ -1631,7 +1565,7 @@ export const pncpDescription: INodeTypeDescription = {
 			description: 'Número da página (mínimo 1)',
 		},
 		{
-			displayName: 'Tamanho da Página',
+			displayName: 'Tamanho Da Página',
 			name: 'tamanhoPagina',
 			type: 'number',
 			typeOptions: {
@@ -1646,8 +1580,6 @@ export const pncpDescription: INodeTypeDescription = {
 				},
 			},
 			default: 10,
-			required: false,
 			description: 'Número de itens por página (10-500)',
 		},
-	],
-};
+];
