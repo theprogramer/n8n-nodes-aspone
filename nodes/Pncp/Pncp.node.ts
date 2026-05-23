@@ -240,25 +240,82 @@ export class Pncp implements INodeType {
 			}
 
 			// Remove keys that are undefined, empty string, or 0 (optional fields not filled)
-			Object.keys(qs).forEach((key) => {
-				const value = qs[key];
-				if (value === undefined || value === '' || value === 0) {
-					delete qs[key];
+			const cleanQs = (input: Record<string, string | number>) => {
+				const out: Record<string, string | number> = {};
+				Object.keys(input).forEach((key) => {
+					const value = input[key];
+					if (value !== undefined && value !== '' && value !== 0) out[key] = value;
+				});
+				return out;
+			};
+
+			// Read pagination toggle (default false — preserves backward compatibility)
+			let returnAll = false;
+			let limitePaginas = 10;
+			try {
+				returnAll = this.getNodeParameter('returnAll', 0, false) as boolean;
+				limitePaginas = this.getNodeParameter('limitePaginas', 0, 10) as number;
+			} catch {
+				// Parameters not defined for this operation; keep defaults
+			}
+
+			const isPaginated = qs.tamanhoPagina !== undefined && qs.tamanhoPagina !== 0;
+
+			if (returnAll && isPaginated && endpoint) {
+				const allData: unknown[] = [];
+				let currentPage = 1;
+				let totalRegistros = 0;
+				let totalPaginas = 1;
+				let paginasBuscadas = 0;
+				let limiteAtingido = false;
+
+				while (true) {
+					qs.pagina = currentPage;
+					const response = await this.helpers.httpRequestWithAuthentication.call(this, 'pncpApi', {
+						...options,
+						url: endpoint,
+						qs: cleanQs(qs),
+					});
+
+					paginasBuscadas++;
+					totalRegistros = (response?.totalRegistros as number) ?? 0;
+					totalPaginas = (response?.totalPaginas as number) ?? 1;
+
+					if (Array.isArray(response?.data)) {
+						allData.push(...response.data);
+					}
+
+					if (currentPage >= totalPaginas) break;
+					if (paginasBuscadas >= limitePaginas) {
+						limiteAtingido = true;
+						break;
+					}
+					currentPage++;
+					await new Promise((resolve) => setTimeout(resolve, 200));
 				}
-			});
 
-			const response = await this.helpers.httpRequestWithAuthentication.call(this, 'pncpApi', {
-				...options,
-				url: endpoint,
-				qs,
-			});
+				returnData.push({
+					json: {
+						data: allData,
+						totalRegistros,
+						totalPaginas,
+						paginasBuscadas,
+						limitePaginasAtingido: limiteAtingido,
+					},
+					pairedItem: { item: 0 },
+				});
+			} else {
+				const response = await this.helpers.httpRequestWithAuthentication.call(this, 'pncpApi', {
+					...options,
+					url: endpoint,
+					qs: cleanQs(qs),
+				});
 
-			returnData.push({
-				json: response,
-				pairedItem: {
-					item: 0,
-				},
-			});
+				returnData.push({
+					json: response,
+					pairedItem: { item: 0 },
+				});
+			}
 		} catch (error) {
 			const err = error as any;
 
