@@ -1582,4 +1582,52 @@ export const pncpProperties: INodeProperties[] = [
 			default: 10,
 			description: 'Número de itens por página (10-500)',
 		},
+		{
+			displayName: 'Buscar Todas Páginas',
+			name: 'returnAll',
+			type: 'boolean',
+			default: false,
+			description: 'Whether to return all results or only up to a given limit',
+			displayOptions: {
+				show: {
+					resource: ['planoContratacao', 'contratacao', 'contrato', 'instrumentoCobranca', 'ata'],
+					operation: [
+						'consultarItensPorUsuarioAno',
+						'consultarPorDataAtualizacao',
+						'consultarItensPorAno',
+						'consultarPorDataPublicacao',
+						'consultarPorPeriodoPropostas',
+						'consultarPorDataInclusao',
+						'consultarPorPeriodoVigencia',
+					],
+				},
+			},
+		},
+		{
+			displayName: 'Limite De Páginas',
+			name: 'limitePaginas',
+			type: 'number',
+			typeOptions: {
+				minValue: 1,
+				maxValue: 1000,
+				numberType: 'integer',
+			},
+			default: 10,
+			description: 'Número máximo de páginas a buscar quando "Buscar Todas Páginas" estiver ligado (proteção contra loops longos)',
+			displayOptions: {
+				show: {
+					returnAll: [true],
+					resource: ['planoContratacao', 'contratacao', 'contrato', 'instrumentoCobranca', 'ata'],
+					operation: [
+						'consultarItensPorUsuarioAno',
+						'consultarPorDataAtualizacao',
+						'consultarItensPorAno',
+						'consultarPorDataPublicacao',
+						'consultarPorPeriodoPropostas',
+						'consultarPorDataInclusao',
+						'consultarPorPeriodoVigencia',
+					],
+				},
+			},
+		},
 ];
