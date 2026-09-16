@@ -10,7 +10,14 @@ import {
 	NodeOperationError,
 } from 'n8n-workflow';
 import { pncpProperties } from './descriptions/PncpDescription';
-import { comRetry, lerRetryConfig, VERSAO } from '../shared/transport';
+import {
+	comRetry,
+	esperar,
+	lerDelayPaginas,
+	lerRetryConfig,
+	MAX_FALHAS_CONSECUTIVAS,
+	VERSAO,
+} from '../shared/transport';
 
 export class Pncp implements INodeType {
 	description: INodeTypeDescription = {
@@ -66,6 +73,7 @@ export class Pncp implements INodeType {
 		const credentials = await this.getCredentials('pncpApi');
 		const baseUrl = credentials.baseUrl as string;
 		const retryConfig = lerRetryConfig(credentials);
+		const delayPaginas = lerDelayPaginas(credentials);
 
 		const options = {
 			baseURL: baseUrl,
@@ -268,35 +276,59 @@ export class Pncp implements INodeType {
 
 			if (returnAll && isPaginated && endpoint) {
 				const allData: unknown[] = [];
+				const paginasComErro: number[] = [];
 				let currentPage = 1;
 				let totalRegistros = 0;
 				let totalPaginas = 1;
 				let paginasBuscadas = 0;
 				let limiteAtingido = false;
+				let falhasConsecutivas = 0;
 
 				while (true) {
-					qs.pagina = currentPage;
-					const response = await this.helpers.httpRequestWithAuthentication.call(this, 'pncpApi', {
-						...options,
-						url: endpoint,
-						qs: cleanQs(qs),
-					});
+					// Captura a página por valor: o closure do comRetry não pode
+					// depender do estado mutável do laço para saber o que pedir.
+					const paginaAtual = currentPage;
 
-					paginasBuscadas++;
-					totalRegistros = (response?.totalRegistros as number) ?? 0;
-					totalPaginas = (response?.totalPaginas as number) ?? 1;
+					try {
+						const response = await comRetry(
+							() =>
+								this.helpers.httpRequestWithAuthentication.call(this, 'pncpApi', {
+									...options,
+									url: endpoint,
+									qs: cleanQs({ ...qs, pagina: paginaAtual }),
+								}),
+							retryConfig,
+						);
 
-					if (Array.isArray(response?.data)) {
-						allData.push(...response.data);
+						falhasConsecutivas = 0;
+						paginasBuscadas++;
+						totalRegistros = (response?.totalRegistros as number) ?? 0;
+						totalPaginas = (response?.totalPaginas as number) ?? 1;
+
+						if (Array.isArray(response?.data)) {
+							allData.push(...response.data);
+						}
+					} catch (erroPagina) {
+						// Sem a página 1 não temos totalPaginas, então não há como
+						// seguir nem como saber o tamanho do que ficou faltando.
+						if (paginaAtual === 1) throw erroPagina;
+
+						paginasComErro.push(paginaAtual);
+						falhasConsecutivas++;
 					}
 
-					if (currentPage >= totalPaginas) break;
-					if (paginasBuscadas >= limitePaginas) {
+					// Circuit break: o servidor está fora, insistir só piora.
+					if (falhasConsecutivas >= MAX_FALHAS_CONSECUTIVAS) break;
+					if (paginaAtual >= totalPaginas) break;
+					// paginaAtual é a contagem de páginas tentadas, incluindo as que falharam.
+					if (paginaAtual >= limitePaginas) {
 						limiteAtingido = true;
 						break;
 					}
 					currentPage++;
-					await new Promise((resolve) => setTimeout(resolve, 200));
+					// Jitter no intervalo entre páginas pelo mesmo motivo do backoff:
+					// não sincronizar workflows concorrentes contra o mesmo servidor.
+					await esperar(delayPaginas * (0.5 + Math.random()));
 				}
 
 				returnData.push({
@@ -306,6 +338,8 @@ export class Pncp implements INodeType {
 						totalPaginas,
 						paginasBuscadas,
 						limitePaginasAtingido: limiteAtingido,
+						paginasComErro,
+						completo: paginasComErro.length === 0,
 					},
 					pairedItem: { item: 0 },
 				});
