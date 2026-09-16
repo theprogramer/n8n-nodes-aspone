@@ -1,0 +1,69 @@
+name: Publish to npm
+
+# Publica via Trusted Publishing (OIDC). Não há NPM_TOKEN nem OTP: o npm
+# confia neste workflow específico deste repositório, verificado por OIDC.
+#
+# Pré-requisito (feito uma vez, no npmjs.com):
+#   Página do pacote -> Settings -> Trusted Publisher
+#     Organization or user: theprogramer
+#     Repository:           n8n-nodes-aspone
+#     Workflow filename:    publish.yml
+#   Todos os campos são case-sensitive e precisam bater exatamente.
+#
+#   Atenção: configurações criadas a partir de 03/09/2026 permitem apenas
+#   `npm stage publish` por padrão. Para que o `npm publish` abaixo funcione,
+#   marque também a permissão de publicação direta.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  # Permite publicar uma versão cuja tag foi criada antes deste workflow existir.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # Gera o token OIDC que o npm valida. Sem isto, não há publish.
+
+jobs:
+  publish:
+    # Trusted publishing não funciona em self-hosted runners.
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      # O npm que vem com o runner pode ser anterior ao 11.5.1, que é a versão
+      # mínima que entende o fluxo de trusted publishing.
+      - name: Garante npm compatível
+        run: |
+          npm install -g npm@latest
+          npm --version
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: npm test
+
+      # Só faz sentido quando disparado por tag. Um publish com a tag divergindo
+      # do package.json geraria uma versão no registry que nenhuma tag aponta.
+      - name: Confere que a tag bate com a versão do package.json
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "Tag v$TAG não bate com package.json $PKG"
+            exit 1
+          fi
+          echo "Tag e package.json concordam em $PKG"
+
+      # `prepublishOnly` roda build e lint de novo antes de empacotar.
+      # A provenance é gerada automaticamente no trusted publishing.
+      - run: npm publish
