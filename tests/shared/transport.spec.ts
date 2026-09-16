@@ -7,6 +7,7 @@ import {
 	extrairStatus,
 } from '../../nodes/shared/transport/retry';
 import type { RetryConfig } from '../../nodes/shared/transport/types';
+import { comRetry } from '../../nodes/shared/transport/executor';
 
 describe('lerRetryConfig', () => {
 	it('aplica defaults quando a credencial não tem os campos', () => {
@@ -214,6 +215,98 @@ describe('calcularEspera', () => {
 		const zerado: RetryConfig = { ...cfg, backoffInicialMs: 0, backoffMaxMs: 0 };
 		expect(calcularEspera(1, zerado)).toBe(0);
 		expect(calcularEspera(1, zerado, 5000)).toBe(0);
+	});
+});
+
+describe('comRetry', () => {
+	const cfg: RetryConfig = {
+		timeoutMs: 60000,
+		maxTentativas: 4,
+		backoffInicialMs: 1000,
+		backoffMaxMs: 16000,
+	};
+
+	/** Coleta as esperas solicitadas sem dormir de verdade */
+	function espiaoDeEspera() {
+		const esperas: number[] = [];
+		const dormir = async (ms: number) => {
+			esperas.push(ms);
+		};
+		return { esperas, dormir };
+	}
+
+	it('não dorme quando a primeira tentativa dá certo', async () => {
+		const { esperas, dormir } = espiaoDeEspera();
+		const operacao = jest.fn<() => Promise<string>>().mockResolvedValue('ok');
+
+		await expect(comRetry(operacao, cfg, dormir)).resolves.toBe('ok');
+
+		expect(operacao).toHaveBeenCalledTimes(1);
+		expect(esperas).toEqual([]);
+	});
+
+	it('retenta e dorme entre as tentativas até obter sucesso', async () => {
+		const { esperas, dormir } = espiaoDeEspera();
+		const erro504 = { response: { statusCode: 504 } };
+		const operacao = jest
+			.fn<() => Promise<string>>()
+			.mockRejectedValueOnce(erro504)
+			.mockRejectedValueOnce(erro504)
+			.mockResolvedValue('ok');
+
+		await expect(comRetry(operacao, cfg, dormir)).resolves.toBe('ok');
+
+		expect(operacao).toHaveBeenCalledTimes(3);
+		expect(esperas).toHaveLength(2);
+	});
+
+	it('desiste após maxTentativas e anexa a contagem ao erro', async () => {
+		const { esperas, dormir } = espiaoDeEspera();
+		const erro504: Record<string, unknown> = { response: { statusCode: 504 } };
+		const operacao = jest.fn<() => Promise<string>>().mockRejectedValue(erro504);
+
+		await expect(comRetry(operacao, cfg, dormir)).rejects.toBe(erro504);
+
+		expect(operacao).toHaveBeenCalledTimes(4);
+		expect(esperas).toHaveLength(3);
+		expect(erro504.tentativas).toBe(4);
+	});
+
+	it('falha de imediato em erro fatal, sem dormir', async () => {
+		const { esperas, dormir } = espiaoDeEspera();
+		const erro404: Record<string, unknown> = { response: { statusCode: 404 } };
+		const operacao = jest.fn<() => Promise<string>>().mockRejectedValue(erro404);
+
+		await expect(comRetry(operacao, cfg, dormir)).rejects.toBe(erro404);
+
+		expect(operacao).toHaveBeenCalledTimes(1);
+		expect(esperas).toEqual([]);
+		expect(erro404.tentativas).toBe(1);
+	});
+
+	it('respeita Retry-After ao calcular a espera', async () => {
+		const { esperas, dormir } = espiaoDeEspera();
+		const erro429 = { response: { statusCode: 429, headers: { 'retry-after': '3' } } };
+		const operacao = jest
+			.fn<() => Promise<string>>()
+			.mockRejectedValueOnce(erro429)
+			.mockResolvedValue('ok');
+
+		await expect(comRetry(operacao, cfg, dormir)).resolves.toBe('ok');
+
+		expect(esperas).toEqual([3000]);
+	});
+
+	it('com maxTentativas 1 não retenta', async () => {
+		const { esperas, dormir } = espiaoDeEspera();
+		const operacao = jest
+			.fn<() => Promise<string>>()
+			.mockRejectedValue({ response: { statusCode: 504 } });
+
+		await expect(comRetry(operacao, { ...cfg, maxTentativas: 1 }, dormir)).rejects.toBeDefined();
+
+		expect(operacao).toHaveBeenCalledTimes(1);
+		expect(esperas).toEqual([]);
 	});
 });
 
