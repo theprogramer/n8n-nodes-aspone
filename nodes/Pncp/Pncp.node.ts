@@ -311,8 +311,8 @@ export class Pncp implements INodeType {
 				});
 			} else {
 				const response = await comRetry(
-					async () =>
-						await this.helpers.httpRequestWithAuthentication.call(this, 'pncpApi', {
+					() =>
+						this.helpers.httpRequestWithAuthentication.call(this, 'pncpApi', {
 							...options,
 							url: endpoint,
 							qs: cleanQs(qs),

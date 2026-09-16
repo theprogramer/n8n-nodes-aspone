@@ -1241,15 +1241,17 @@ Por:
 				let falhasConsecutivas = 0;
 
 				while (true) {
-					qs.pagina = currentPage;
+					// Captura a página por valor: o closure do comRetry não pode
+					// depender do estado mutável do laço para saber o que pedir.
+					const paginaAtual = currentPage;
 
 					try {
 						const response = await comRetry(
-							async () =>
-								await this.helpers.httpRequestWithAuthentication.call(this, 'pncpApi', {
+							() =>
+								this.helpers.httpRequestWithAuthentication.call(this, 'pncpApi', {
 									...options,
 									url: endpoint,
-									qs: cleanQs(qs),
+									qs: cleanQs({ ...qs, pagina: paginaAtual }),
 								}),
 							retryConfig,
 						);
