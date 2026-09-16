@@ -30,7 +30,10 @@ interface Faixa {
 	max: number;
 }
 
-const FAIXAS: Record<string, Faixa> = {
+/** Campos configuráveis: os do RetryConfig mais o delay de paginação */
+type CampoConfig = keyof RetryConfig | 'delayEntrePaginasMs';
+
+const FAIXAS: Record<CampoConfig, Faixa> = {
 	timeoutMs: { padrao: 60000, min: 5000, max: 300000 },
 	maxTentativas: { padrao: 4, min: 1, max: 10 },
 	backoffInicialMs: { padrao: 1000, min: 0, max: 30000 },
