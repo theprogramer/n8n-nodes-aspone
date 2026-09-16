@@ -5,8 +5,11 @@ export const esperar = (ms: number): Promise<void> =>
 	new Promise((resolve) => setTimeout(resolve, ms));
 
 function anexarTentativas(erro: unknown, tentativas: number): void {
-	if (erro && typeof erro === 'object') {
+	if (!erro || typeof erro !== 'object') return;
+	try {
 		(erro as { tentativas?: number }).tentativas = tentativas;
+	} catch {
+		// Erro congelado: seguir sem a contagem é melhor que mascarar a falha real
 	}
 }
 
@@ -21,6 +24,10 @@ export async function comRetry<T>(
 	cfg: RetryConfig,
 	dormir: (ms: number) => Promise<void> = esperar,
 ): Promise<T> {
+	if (!Number.isFinite(cfg.maxTentativas) || cfg.maxTentativas < 1) {
+		throw new Error(`maxTentativas deve ser >= 1, recebido: ${cfg.maxTentativas}`);
+	}
+
 	let ultimoErro: unknown;
 
 	for (let tentativa = 1; tentativa <= cfg.maxTentativas; tentativa++) {

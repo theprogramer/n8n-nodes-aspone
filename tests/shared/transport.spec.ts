@@ -299,13 +299,25 @@ describe('comRetry', () => {
 
 	it('com maxTentativas 1 não retenta', async () => {
 		const { esperas, dormir } = espiaoDeEspera();
-		const operacao = jest
-			.fn<() => Promise<string>>()
-			.mockRejectedValue({ response: { statusCode: 504 } });
+		const erro: Record<string, unknown> = { response: { statusCode: 504 } };
+		const operacao = jest.fn<() => Promise<string>>().mockRejectedValue(erro);
 
-		await expect(comRetry(operacao, { ...cfg, maxTentativas: 1 }, dormir)).rejects.toBeDefined();
+		await expect(comRetry(operacao, { ...cfg, maxTentativas: 1 }, dormir)).rejects.toBe(erro);
 
 		expect(operacao).toHaveBeenCalledTimes(1);
+		expect(esperas).toEqual([]);
+		expect(erro.tentativas).toBe(1);
+	});
+
+	it('rejeita maxTentativas inválido em vez de lançar undefined', async () => {
+		const { esperas, dormir } = espiaoDeEspera();
+		const operacao = jest.fn<() => Promise<string>>().mockResolvedValue('ok');
+
+		await expect(comRetry(operacao, { ...cfg, maxTentativas: 0 }, dormir)).rejects.toThrow(
+			/maxTentativas/,
+		);
+
+		expect(operacao).not.toHaveBeenCalled();
 		expect(esperas).toEqual([]);
 	});
 });
