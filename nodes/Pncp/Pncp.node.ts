@@ -10,6 +10,7 @@ import {
 	NodeOperationError,
 } from 'n8n-workflow';
 import { pncpProperties } from './descriptions/PncpDescription';
+import { comRetry, lerRetryConfig, VERSAO } from '../shared/transport';
 
 export class Pncp implements INodeType {
 	description: INodeTypeDescription = {
@@ -64,13 +65,17 @@ export class Pncp implements INodeType {
 
 		const credentials = await this.getCredentials('pncpApi');
 		const baseUrl = credentials.baseUrl as string;
+		const retryConfig = lerRetryConfig(credentials);
 
 		const options = {
 			baseURL: baseUrl,
 			headers: {
 				'Content-Type': 'application/json',
+				Accept: 'application/json',
+				'User-Agent': `n8n-nodes-aspone/${VERSAO}`,
 			},
 			method: 'GET' as const,
+			timeout: retryConfig.timeoutMs,
 		};
 
 		const formatDateToYYYYMMDD = (dateStr: string): string => {
@@ -305,11 +310,15 @@ export class Pncp implements INodeType {
 					pairedItem: { item: 0 },
 				});
 			} else {
-				const response = await this.helpers.httpRequestWithAuthentication.call(this, 'pncpApi', {
-					...options,
-					url: endpoint,
-					qs: cleanQs(qs),
-				});
+				const response = await comRetry(
+					async () =>
+						await this.helpers.httpRequestWithAuthentication.call(this, 'pncpApi', {
+							...options,
+							url: endpoint,
+							qs: cleanQs(qs),
+						}),
+					retryConfig,
+				);
 
 				returnData.push({
 					json: response,
@@ -332,6 +341,7 @@ export class Pncp implements INodeType {
 				statusCode,
 				message: serverMessage,
 				serverResponse: serverBody,
+				tentativas: err?.tentativas,
 			};
 
 			if (this.continueOnFail()) {

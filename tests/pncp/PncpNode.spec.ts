@@ -26,6 +26,9 @@ describe('PncpNode', () => {
 		(mockExecuteFunctions.getCredentials as any).mockResolvedValue({
 			baseUrl: 'https://api.pncp.gov.br/api/consulta',
 			bearerToken: 'test-token',
+			backoffInicialMs: 0,
+			backoffMaxMs: 0,
+			delayEntrePaginasMs: 0,
 		});
 
 		(mockExecuteFunctions.getNodeParameter as any)
@@ -46,8 +49,13 @@ describe('PncpNode', () => {
 				baseURL: 'https://api.pncp.gov.br/api/consulta',
 				url: '/v1/pca/usuario',
 				method: 'GET',
+				timeout: 60000,
 				qs: { anoPca: 2024, idUsuario: 1, pagina: 1, tamanhoPagina: 10 },
-				headers: { 'Content-Type': 'application/json' },
+				headers: {
+					'Content-Type': 'application/json',
+					Accept: 'application/json',
+					'User-Agent': 'n8n-nodes-aspone/0.1.3',
+				},
 			}
 		);
 
@@ -71,11 +79,17 @@ describe('PncpNode', () => {
 
 		(mockExecuteFunctions.getCredentials as any).mockResolvedValue({
 			baseUrl: 'https://api.pncp.gov.br/api/consulta',
+			maxTentativas: 1,
+			backoffInicialMs: 0,
+			backoffMaxMs: 0,
+			delayEntrePaginasMs: 0,
 		});
 
 		(mockExecuteFunctions.getNodeParameter as any)
 			.mockReturnValueOnce('planoContratacao') // resource
-			.mockReturnValue('consultarItensPorUsuarioAno'); // operation + remaining params
+			.mockReturnValueOnce('consultarItensPorUsuarioAno'); // operation
+		// Params restantes (incluindo tamanhoPagina e returnAll) ficam undefined
+		// pelo default do mock — isPaginated some e a via não paginada é usada.
 
 		const result = await node.execute.call(mockExecuteFunctions);
 
@@ -85,6 +99,7 @@ describe('PncpNode', () => {
 				statusCode: undefined,
 				message: 'API Error',
 				serverResponse: undefined,
+				tentativas: 1,
 			},
 			pairedItem: { item: 0 },
 		}]]);
