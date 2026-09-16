@@ -16,8 +16,16 @@ import {
 	lerDelayPaginas,
 	lerRetryConfig,
 	MAX_FALHAS_CONSECUTIVAS,
+	PERFIL_IBGE,
 	VERSAO,
 } from '../shared/transport';
+
+/**
+ * A lista de municípios do IBGE é estática. Cachear por UF no escopo do
+ * módulo elimina a maior parte das chamadas: o dropdown do editor refaz a
+ * consulta a cada abertura. O cache vive enquanto o processo do n8n viver.
+ */
+const cacheCidades = new Map<string, Array<{ name: string; value: number }>>();
 
 export class Pncp implements INodeType {
 	description: INodeTypeDescription = {
@@ -51,15 +59,34 @@ export class Pncp implements INodeType {
 				const uf = this.getCurrentNodeParameter('uf') as string;
 				if (!uf) return [emptyOption];
 
-				const response = (await this.helpers.httpRequest({
-					method: 'GET',
-					url: `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf}/municipios`,
-				})) as Array<{ nome: string; id: number }>;
+				const cacheado = cacheCidades.get(uf);
+				if (cacheado) return [emptyOption, ...cacheado];
+
+				let response: Array<{ nome: string; id: number }>;
+				try {
+					response = await comRetry(
+						async () =>
+							(await this.helpers.httpRequest({
+								method: 'GET',
+								url: `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf}/municipios`,
+								timeout: PERFIL_IBGE.timeoutMs,
+								headers: { Accept: 'application/json' },
+							})) as Array<{ nome: string; id: number }>,
+						PERFIL_IBGE,
+					);
+				} catch {
+					// Falha visível é melhor que um dropdown silenciosamente vazio.
+					throw new NodeOperationError(
+						this.getNode(),
+						`Não foi possível carregar os municípios de ${uf}: o serviço do IBGE está indisponível`,
+					);
+				}
 
 				const cidades = response
 					.map((cidade) => ({ name: cidade.nome, value: cidade.id }))
 					.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
+				cacheCidades.set(uf, cidades);
 				return [emptyOption, ...cidades];
 			},
 		},

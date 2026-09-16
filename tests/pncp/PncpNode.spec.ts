@@ -235,3 +235,73 @@ describe('PncpNode', () => {
 		});
 	});
 });
+
+describe('PncpNode.getCidades', () => {
+	const node = new Pncp();
+
+	function contextoLoadOptions(uf: string, mockHttpRequest: any) {
+		return {
+			getCurrentNodeParameter: jest.fn().mockReturnValue(uf),
+			getNode: jest.fn().mockReturnValue({}),
+			helpers: { httpRequest: mockHttpRequest },
+		} as any;
+	}
+
+	it('devolve apenas a opção vazia quando não há UF selecionada', async () => {
+		const mockHttpRequest = jest.fn() as any;
+		const resultado = await node.methods.loadOptions.getCidades.call(
+			contextoLoadOptions('', mockHttpRequest),
+		);
+
+		expect(resultado).toEqual([{ name: '- Não Filtrar -', value: '' }]);
+		expect(mockHttpRequest).not.toHaveBeenCalled();
+	});
+
+	it('ordena os municípios e prepende a opção vazia', async () => {
+		const mockHttpRequest = jest.fn() as any;
+		mockHttpRequest.mockResolvedValue([
+			{ nome: 'Uberlândia', id: 3170206 },
+			{ nome: 'Araxá', id: 3104007 },
+		]);
+
+		const resultado = await node.methods.loadOptions.getCidades.call(
+			contextoLoadOptions('MG', mockHttpRequest),
+		);
+
+		expect(resultado).toEqual([
+			{ name: '- Não Filtrar -', value: '' },
+			{ name: 'Araxá', value: 3104007 },
+			{ name: 'Uberlândia', value: 3170206 },
+		]);
+	});
+
+	it('usa cache na segunda chamada para a mesma UF', async () => {
+		const mockHttpRequest = jest.fn() as any;
+		mockHttpRequest.mockResolvedValue([{ nome: 'Salvador', id: 2927408 }]);
+
+		const contexto = contextoLoadOptions('BA', mockHttpRequest);
+		await node.methods.loadOptions.getCidades.call(contexto);
+		await node.methods.loadOptions.getCidades.call(contexto);
+
+		expect(mockHttpRequest).toHaveBeenCalledTimes(1);
+	});
+
+	it('retenta antes de desistir e lança mensagem em pt-BR', async () => {
+		const mockHttpRequest = jest.fn() as any;
+		mockHttpRequest.mockRejectedValue({ response: { statusCode: 503 } });
+
+		await expect(
+			node.methods.loadOptions.getCidades.call(contextoLoadOptions('AC', mockHttpRequest)),
+		).rejects.toBeInstanceOf(NodeOperationError);
+
+		expect(mockHttpRequest).toHaveBeenCalledTimes(3);
+
+		// O automock de `n8n-workflow` não roda o construtor real, então a
+		// instância sai com `message` vazia e nem é `instanceof Error`.
+		// A mensagem só pode ser verificada no argumento do construtor.
+		expect(NodeOperationError).toHaveBeenLastCalledWith(
+			expect.anything(),
+			expect.stringContaining('IBGE'),
+		);
+	}, 15000);
+});
