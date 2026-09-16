@@ -5,7 +5,7 @@ import type { RetryConfig } from './types';
  * acoplaria o código ao layout do `dist`, onde ele é copiado para a raiz
  * e não para junto deste módulo.
  */
-export const VERSAO = '0.1.3';
+export const VERSAO = '0.1.4';
 
 export const DELAY_PAGINAS_PADRAO_MS = 200;
 
