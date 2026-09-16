@@ -28,7 +28,10 @@ export class DadosAbertosNode implements INodeType {
 		usableAsTool: true,
 	  requestDefaults: {
 			baseURL: '=https://dadosabertos.compras.gov.br',
-			timeout: 60000,
+			// 120s, não os 60s do node PNCP: aqui não há retry para se recuperar
+			// de um timeout, então cortar cedo transforma uma chamada lenta que
+			// funcionava em falha dura. O objetivo é só limitar um travamento.
+			timeout: 120000,
 			headers: {
 				Accept: 'application/json',
 			},

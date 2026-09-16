@@ -1,6 +1,7 @@
 import type {
 	IExecuteFunctions,
 	INodeExecutionData,
+	JsonObject,
 	NodeConnectionType,
 } from 'n8n-workflow';
 import {
@@ -341,6 +342,12 @@ export class Pncp implements INodeType {
 			if (returnAll && isPaginated && endpoint) {
 				const allData: unknown[] = [];
 				const paginasComErro: number[] = [];
+				const errosPorPagina: Array<{
+					pagina: number;
+					statusCode?: number;
+					mensagem?: string;
+					tentativas?: number;
+				}> = [];
 				let totalRegistros = 0;
 				let totalPaginas = 1;
 				let paginasBuscadas = 0;
@@ -375,6 +382,22 @@ export class Pncp implements INodeType {
 						if (paginaAtual === 1) throw erroPagina;
 
 						paginasComErro.push(paginaAtual);
+						// Só o número da página não deixa o usuário distinguir um 429
+						// (tentar de novo mais tarde) de um 404 (não adianta insistir).
+						const errPagina = erroPagina as {
+							response?: { body?: { message?: string; mensagem?: string } };
+							message?: string;
+							tentativas?: number;
+						};
+						errosPorPagina.push({
+							pagina: paginaAtual,
+							statusCode: extrairStatus(erroPagina),
+							mensagem:
+								errPagina?.response?.body?.message ??
+								errPagina?.response?.body?.mensagem ??
+								errPagina?.message,
+							tentativas: errPagina?.tentativas,
+						});
 						falhasConsecutivas++;
 					}
 
@@ -403,6 +426,7 @@ export class Pncp implements INodeType {
 						paginasBuscadas,
 						limitePaginasAtingido: limiteAtingido,
 						paginasComErro,
+						errosPorPagina,
 						completo: paginasComErro.length === 0,
 					},
 					pairedItem: { item: 0 },
@@ -426,7 +450,9 @@ export class Pncp implements INodeType {
 		} catch (error) {
 			const err = error as any;
 
-			const statusCode = err?.response?.statusCode;
+			// extrairStatus também cobre `response.status` (formato axios cru), que
+			// `err?.response?.statusCode` sozinho deixaria passar como undefined.
+			const statusCode = extrairStatus(err);
 			const serverBody = err?.response?.body;
 			const serverMessage =
 				serverBody?.message ||
@@ -448,7 +474,9 @@ export class Pncp implements INodeType {
 					pairedItem: { item: 0 },
 				});
 			} else {
-				throw new NodeOperationError(this.getNode(), errorPayload, {
+				// `statusCode` pode ser undefined (erro sem resposta HTTP), o que
+				// JsonObject não admite — o n8n descarta a chave ao serializar.
+				throw new NodeOperationError(this.getNode(), errorPayload as unknown as JsonObject, {
 					description: serverMessage,
 				});
 			}

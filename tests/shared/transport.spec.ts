@@ -1,5 +1,12 @@
 import { describe, it, expect, jest, afterEach } from '@jest/globals';
-import { lerRetryConfig, lerDelayPaginas, PERFIL_IBGE } from '../../nodes/shared/transport/config';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import {
+	lerRetryConfig,
+	lerDelayPaginas,
+	PERFIL_IBGE,
+	VERSAO,
+} from '../../nodes/shared/transport/config';
 import {
 	calcularEspera,
 	classificarErro,
@@ -74,6 +81,18 @@ describe('lerDelayPaginas', () => {
 
 	it('faz clamp acima de 10000', () => {
 		expect(lerDelayPaginas({ delayEntrePaginasMs: 99999 })).toBe(10000);
+	});
+});
+
+describe('VERSAO', () => {
+	it('acompanha a versão do package.json', () => {
+		// O User-Agent enviado ao PNCP carrega esta string. Ela é mantida à mão
+		// porque importar o package.json acoplaria o código ao layout do dist —
+		// então precisa de um teste para não silenciar no próximo bump de versão.
+		const pkg = JSON.parse(
+			readFileSync(join(__dirname, '../../package.json'), 'utf8'),
+		) as { version: string };
+		expect(VERSAO).toBe(pkg.version);
 	});
 });
 

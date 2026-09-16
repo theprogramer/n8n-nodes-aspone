@@ -169,6 +169,9 @@ describe('PncpNode', () => {
 			paginasBuscadas: 2,
 			limitePaginasAtingido: false,
 			paginasComErro: [2],
+			errosPorPagina: [
+				{ pagina: 2, statusCode: 504, mensagem: undefined, tentativas: 1 },
+			],
 			completo: false,
 		});
 	});
@@ -186,8 +189,54 @@ describe('PncpNode', () => {
 			paginasBuscadas: 2,
 			limitePaginasAtingido: false,
 			paginasComErro: [],
+			errosPorPagina: [],
 			completo: true,
 		});
+	});
+
+	it('recupera uma página que falha e depois responde, sem marcar erro', async () => {
+		const mockHttpRequest = jest.fn() as any;
+		mockHttpRequest
+			.mockResolvedValueOnce(pagina(1, 2))
+			.mockRejectedValueOnce({ response: { statusCode: 504 } })
+			.mockResolvedValueOnce(pagina(2, 2));
+
+		// maxTentativas 2: a página 2 falha na primeira e acerta na segunda.
+		const contexto = contextoPaginado(mockHttpRequest);
+		(contexto.getCredentials as any).mockResolvedValue({
+			baseUrl: 'https://api.pncp.gov.br/api/consulta',
+			maxTentativas: 2,
+			backoffInicialMs: 0,
+			backoffMaxMs: 0,
+			delayEntrePaginasMs: 0,
+		});
+
+		const result = await node.execute.call(contexto);
+
+		expect(mockHttpRequest).toHaveBeenCalledTimes(3);
+		expect(result[0][0].json).toMatchObject({
+			data: ['item-1', 'item-2'],
+			paginasBuscadas: 2,
+			paginasComErro: [],
+			errosPorPagina: [],
+			completo: true,
+		});
+	});
+
+	it('guarda status e tentativas da página que falhou, não só o número', async () => {
+		const mockHttpRequest = jest.fn() as any;
+		mockHttpRequest
+			.mockResolvedValueOnce(pagina(1, 3))
+			.mockRejectedValueOnce({
+				response: { statusCode: 429, body: { message: 'Limite de requisições' } },
+			})
+			.mockResolvedValueOnce(pagina(3, 3));
+
+		const result = await node.execute.call(contextoPaginado(mockHttpRequest));
+
+		expect((result[0][0].json as any).errosPorPagina).toEqual([
+			{ pagina: 2, statusCode: 429, mensagem: 'Limite de requisições', tentativas: 1 },
+		]);
 	});
 
 	it('lança erro quando a página 1 falha, pois não há totalPaginas', async () => {

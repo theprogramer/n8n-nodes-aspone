@@ -87,12 +87,17 @@ Com "Buscar Todas Páginas" ligado, a saída ganha dois campos:
   "paginasBuscadas": 24,
   "limitePaginasAtingido": false,
   "paginasComErro": [7],
+  "errosPorPagina": [
+    { "pagina": 7, "statusCode": 429, "mensagem": "Limite de requisições", "tentativas": 4 }
+  ],
   "completo": false
 }
 ```
 
 Se uma página falhar em todas as tentativas, o node registra o número em
-`paginasComErro`, marca `completo: false` e continua. Você recebe o que deu para
+`paginasComErro`, o diagnóstico em `errosPorPagina`, marca `completo: false` e
+continua. `errosPorPagina` existe porque só o número da página não deixa você
+distinguir um `429` (vale tentar mais tarde) de um `404` (não adianta insistir). Você recebe o que deu para
 buscar em vez de perder a execução inteira. Use `completo` em um nó IF para
 decidir se reprocessa.
 
@@ -102,6 +107,21 @@ páginas consecutivas** falharem, o node para (*circuit break*): o servidor est�
 fora, insistir só piora.
 
 `Limite De Páginas` conta páginas **tentadas**, incluindo as que falharam.
+
+### Quanto tempo uma execução pode levar
+
+Os parâmetros se multiplicam: o pior caso de uma execução é
+`Timeout Por Requisição × Máximo De Tentativas × páginas tentadas`. Com os
+defaults e `Limite De Páginas` em 10, isso dá 60s × 4 × 10 = **40 minutos** se o
+servidor estiver lento a ponto de estourar o timeout em toda tentativa.
+
+Nada limita esse produto — `Limite De Páginas` limita iterações, não tempo, e
+aceita até 1000. Se você aumentar o limite de páginas para buscar mais dados,
+aumente na mesma conta o risco de execuções longas. Para workflows com janela de
+tempo apertada, baixe `Timeout Por Requisição` ou `Máximo De Tentativas`.
+
+O *circuit break* só ajuda quando as falhas são consecutivas; falhas
+intercaladas não o acionam.
 
 ### Interação com o "Retry On Fail" do n8n
 
@@ -128,7 +148,12 @@ IBGE é estática, e antes disso cada abertura do dropdown refazia a chamada.
 
 Node declarativo não suporta retry customizado (`retryOnFail` e `maxTries`
 existem em `INode`, não em `INodeTypeDescription`). Ele recebe o que a API
-declarativa permite: timeout explícito de 60s e header `Accept`.
+declarativa permite: um timeout explícito e o header `Accept`.
+
+O timeout é de 120s, mais folgado que os 60s do node PNCP, justamente porque
+aqui não há retry para se recuperar dele. Antes desta versão essas chamadas
+usavam o default do n8n (300s), então cortar em 60s transformaria uma chamada
+lenta que funcionava em falha dura. O objetivo é apenas limitar um travamento.
 
 ## License
 
