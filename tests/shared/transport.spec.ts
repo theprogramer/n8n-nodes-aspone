@@ -1,5 +1,12 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect, jest, afterEach } from '@jest/globals';
 import { lerRetryConfig, lerDelayPaginas, PERFIL_IBGE } from '../../nodes/shared/transport/config';
+import {
+	calcularEspera,
+	classificarErro,
+	extrairRetryAfterMs,
+	extrairStatus,
+} from '../../nodes/shared/transport/retry';
+import type { RetryConfig } from '../../nodes/shared/transport/types';
 
 describe('lerRetryConfig', () => {
 	it('aplica defaults quando a credencial não tem os campos', () => {
@@ -79,3 +86,129 @@ describe('PERFIL_IBGE', () => {
 		});
 	});
 });
+
+describe('extrairStatus', () => {
+	it('lê de response.statusCode (formato do helper do n8n)', () => {
+		expect(extrairStatus({ response: { statusCode: 504 } })).toBe(504);
+	});
+
+	it('lê de response.status (formato axios cru)', () => {
+		expect(extrairStatus({ response: { status: 502 } })).toBe(502);
+	});
+
+	it('lê de statusCode na raiz', () => {
+		expect(extrairStatus({ statusCode: 429 })).toBe(429);
+	});
+
+	it('devolve undefined quando não há status', () => {
+		expect(extrairStatus(new Error('boom'))).toBeUndefined();
+		expect(extrairStatus(undefined)).toBeUndefined();
+	});
+});
+
+describe('classificarErro', () => {
+	it.each([408, 425, 429, 500, 502, 503, 504])('trata %i como retryável', (status) => {
+		expect(classificarErro({ response: { statusCode: status } })).toBe('retryavel');
+	});
+
+	it.each([400, 401, 403, 404, 422])('trata %i como fatal', (status) => {
+		expect(classificarErro({ response: { statusCode: status } })).toBe('fatal');
+	});
+
+	it('trata 5xx fora da lista como retryável', () => {
+		expect(classificarErro({ response: { statusCode: 599 } })).toBe('retryavel');
+	});
+
+	it.each(['ECONNRESET', 'ETIMEDOUT', 'ESOCKETTIMEDOUT', 'EAI_AGAIN', 'EPIPE'])(
+		'trata o código de rede %s como retryável',
+		(code) => {
+			expect(classificarErro({ code })).toBe('retryavel');
+		},
+	);
+
+	it('trata código conhecido mas não transitório como fatal', () => {
+		expect(classificarErro({ code: 'CERT_HAS_EXPIRED' })).toBe('fatal');
+		expect(classificarErro({ code: 'ENOTFOUND' })).toBe('fatal');
+	});
+
+	it('trata erro sem status e sem código como retryável', () => {
+		expect(classificarErro(new Error('socket hang up'))).toBe('retryavel');
+	});
+});
+
+describe('extrairRetryAfterMs', () => {
+	it('lê Retry-After em segundos', () => {
+		expect(extrairRetryAfterMs({ response: { headers: { 'retry-after': '120' } } })).toBe(120000);
+	});
+
+	it('lê Retry-After como HTTP-date', () => {
+		const agora = Date.parse('2026-09-16T08:00:00Z');
+		const erro = { response: { headers: { 'retry-after': 'Wed, 16 Sep 2026 08:00:30 GMT' } } };
+		expect(extrairRetryAfterMs(erro, agora)).toBe(30000);
+	});
+
+	it('devolve 0 para HTTP-date no passado', () => {
+		const agora = Date.parse('2026-09-16T08:00:00Z');
+		const erro = { response: { headers: { 'retry-after': 'Wed, 16 Sep 2026 07:00:00 GMT' } } };
+		expect(extrairRetryAfterMs(erro, agora)).toBe(0);
+	});
+
+	it('aceita o header com capitalização alternativa', () => {
+		expect(extrairRetryAfterMs({ response: { headers: { 'Retry-After': '5' } } })).toBe(5000);
+	});
+
+	it('devolve undefined quando ausente ou inválido', () => {
+		expect(extrairRetryAfterMs({ response: { headers: {} } })).toBeUndefined();
+		expect(extrairRetryAfterMs({ response: {} })).toBeUndefined();
+		expect(extrairRetryAfterMs(new Error('boom'))).toBeUndefined();
+		expect(
+			extrairRetryAfterMs({ response: { headers: { 'retry-after': 'depois' } } }),
+		).toBeUndefined();
+	});
+});
+
+describe('calcularEspera', () => {
+	const cfg: RetryConfig = {
+		timeoutMs: 60000,
+		maxTentativas: 4,
+		backoffInicialMs: 1000,
+		backoffMaxMs: 16000,
+	};
+
+	afterEach(() => {
+		jest.restoreAllMocks();
+	});
+
+	it('cresce exponencialmente com jitter em [0, teto]', () => {
+		jest.spyOn(Math, 'random').mockReturnValue(1);
+		expect(calcularEspera(1, cfg)).toBe(1000);
+		expect(calcularEspera(2, cfg)).toBe(2000);
+		expect(calcularEspera(3, cfg)).toBe(4000);
+	});
+
+	it('com random em 0, a espera é 0 (full jitter)', () => {
+		jest.spyOn(Math, 'random').mockReturnValue(0);
+		expect(calcularEspera(3, cfg)).toBe(0);
+	});
+
+	it('respeita o teto backoffMaxMs', () => {
+		jest.spyOn(Math, 'random').mockReturnValue(1);
+		expect(calcularEspera(10, cfg)).toBe(16000);
+	});
+
+	it('Retry-After sobrepõe o backoff calculado', () => {
+		jest.spyOn(Math, 'random').mockReturnValue(1);
+		expect(calcularEspera(1, cfg, 5000)).toBe(5000);
+	});
+
+	it('Retry-After também é limitado pelo teto', () => {
+		expect(calcularEspera(1, cfg, 999999)).toBe(16000);
+	});
+
+	it('devolve 0 quando o backoff está zerado', () => {
+		const zerado: RetryConfig = { ...cfg, backoffInicialMs: 0, backoffMaxMs: 0 };
+		expect(calcularEspera(1, zerado)).toBe(0);
+		expect(calcularEspera(1, zerado, 5000)).toBe(0);
+	});
+});
+
