@@ -119,7 +119,7 @@ describe('classificarErro', () => {
 		expect(classificarErro({ response: { statusCode: 599 } })).toBe('retryavel');
 	});
 
-	it.each(['ECONNRESET', 'ETIMEDOUT', 'ESOCKETTIMEDOUT', 'EAI_AGAIN', 'EPIPE'])(
+	it.each(['ECONNRESET', 'ETIMEDOUT', 'ESOCKETTIMEDOUT', 'EAI_AGAIN', 'EPIPE', 'ECONNABORTED', 'ECONNREFUSED'])(
 		'trata o código de rede %s como retryável',
 		(code) => {
 			expect(classificarErro({ code })).toBe('retryavel');
@@ -189,6 +189,11 @@ describe('calcularEspera', () => {
 	it('com random em 0, a espera é 0 (full jitter)', () => {
 		jest.spyOn(Math, 'random').mockReturnValue(0);
 		expect(calcularEspera(3, cfg)).toBe(0);
+	});
+
+	it('com random em 0.5, a espera é metade do teto (jitter uniforme)', () => {
+		jest.spyOn(Math, 'random').mockReturnValue(0.5);
+		expect(calcularEspera(3, cfg)).toBe(2000);
 	});
 
 	it('respeita o teto backoffMaxMs', () => {
