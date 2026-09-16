@@ -2,6 +2,9 @@ import { describe, it, expect, jest } from '@jest/globals';
 import type { IExecuteFunctions } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
 import { Pncp } from '../../nodes/Pncp/Pncp.node';
+// VERSAO em vez de literal: o teste em tests/shared prende VERSAO ao
+// package.json, então a cadeia fica verificada sem quebrar a cada release.
+import { VERSAO } from '../../nodes/shared/transport/config';
 
 jest.mock('n8n-workflow');
 
@@ -55,7 +58,7 @@ describe('PncpNode', () => {
 				headers: {
 					'Content-Type': 'application/json',
 					Accept: 'application/json',
-					'User-Agent': 'n8n-nodes-aspone/0.1.3',
+					'User-Agent': `n8n-nodes-aspone/${VERSAO}`,
 				},
 			}
 		);
