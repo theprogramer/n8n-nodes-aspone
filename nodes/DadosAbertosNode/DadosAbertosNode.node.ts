@@ -28,6 +28,10 @@ export class DadosAbertosNode implements INodeType {
 		usableAsTool: true,
 	  requestDefaults: {
 			baseURL: '=https://dadosabertos.compras.gov.br',
+			timeout: 60000,
+			headers: {
+				Accept: 'application/json',
+			},
 		},
 		properties: [
 			{
