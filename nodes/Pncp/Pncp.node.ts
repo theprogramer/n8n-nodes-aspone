@@ -13,6 +13,7 @@ import { pncpProperties } from './descriptions/PncpDescription';
 import {
 	comRetry,
 	esperar,
+	extrairStatus,
 	lerDelayPaginas,
 	lerRetryConfig,
 	MAX_FALHAS_CONSECUTIVAS,
@@ -26,6 +27,25 @@ import {
  * consulta a cada abertura. O cache vive enquanto o processo do n8n viver.
  */
 const cacheCidades = new Map<string, Array<{ name: string; value: number }>>();
+
+type MunicipioIBGE = { nome: string; id: number };
+
+/**
+ * Sem essa validação, um corpo inesperado ou vira TypeError cru (se não for
+ * array) ou entra no cache e contamina o dropdown pelo resto do processo
+ * (se for array com itens malformados) — o cache não tem invalidação.
+ */
+function ehListaDeMunicipios(valor: unknown): valor is MunicipioIBGE[] {
+	return (
+		Array.isArray(valor) &&
+		valor.every(
+			(item) =>
+				!!item &&
+				typeof (item as MunicipioIBGE).nome === 'string' &&
+				typeof (item as MunicipioIBGE).id === 'number',
+		)
+	);
+}
 
 export class Pncp implements INodeType {
 	description: INodeTypeDescription = {
@@ -62,7 +82,7 @@ export class Pncp implements INodeType {
 				const cacheado = cacheCidades.get(uf);
 				if (cacheado) return [emptyOption, ...cacheado];
 
-				let response: Array<{ nome: string; id: number }>;
+				let response: MunicipioIBGE[];
 				try {
 					response = await comRetry(
 						async () =>
@@ -71,14 +91,31 @@ export class Pncp implements INodeType {
 								url: `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf}/municipios`,
 								timeout: PERFIL_IBGE.timeoutMs,
 								headers: { Accept: 'application/json' },
-							})) as Array<{ nome: string; id: number }>,
+							})) as MunicipioIBGE[],
 						PERFIL_IBGE,
 					);
-				} catch {
+				} catch (erro) {
+					const status = extrairStatus(erro);
+					const causa =
+						status !== undefined
+							? `HTTP ${status}`
+							: (erro as { code?: string })?.code ?? (erro as Error)?.message ?? 'causa desconhecida';
+					const tentativas = (erro as { tentativas?: number })?.tentativas ?? PERFIL_IBGE.maxTentativas;
+
 					// Falha visível é melhor que um dropdown silenciosamente vazio.
 					throw new NodeOperationError(
 						this.getNode(),
 						`Não foi possível carregar os municípios de ${uf}: o serviço do IBGE está indisponível`,
+						{ description: `Falhou após ${tentativas} tentativas (${causa})` },
+					);
+				}
+
+				if (!ehListaDeMunicipios(response)) {
+					// Sem isso, um corpo inesperado ou vira TypeError cru, ou entra
+					// no cache e contamina o dropdown pelo resto do processo.
+					throw new NodeOperationError(
+						this.getNode(),
+						`Resposta inesperada do IBGE ao carregar os municípios de ${uf}`,
 					);
 				}
 

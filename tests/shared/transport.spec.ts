@@ -80,10 +80,10 @@ describe('lerDelayPaginas', () => {
 describe('PERFIL_IBGE', () => {
 	it('usa timeout curto, adequado a um dropdown do editor', () => {
 		expect(PERFIL_IBGE).toEqual({
-			timeoutMs: 15000,
+			timeoutMs: 5000,
 			maxTentativas: 3,
-			backoffInicialMs: 500,
-			backoffMaxMs: 4000,
+			backoffInicialMs: 300,
+			backoffMaxMs: 2000,
 		});
 	});
 });

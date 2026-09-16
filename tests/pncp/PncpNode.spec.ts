@@ -237,6 +237,10 @@ describe('PncpNode', () => {
 });
 
 describe('PncpNode.getCidades', () => {
+	// `cacheCidades` é module-level e não é exposto para os testes. Por isso
+	// cada teste deste describe precisa usar uma UF que nenhum outro teste
+	// usa — reaproveitar uma UF faz o teste acertar por acidente, batendo no
+	// cache em vez de exercitar o código que deveria testar.
 	const node = new Pncp();
 
 	function contextoLoadOptions(uf: string, mockHttpRequest: any) {
@@ -302,6 +306,36 @@ describe('PncpNode.getCidades', () => {
 		expect(NodeOperationError).toHaveBeenLastCalledWith(
 			expect.anything(),
 			expect.stringContaining('IBGE'),
+			expect.objectContaining({ description: expect.stringContaining('tentativas') }),
 		);
 	}, 15000);
+
+	it('rejeita corpo que não é uma lista, sem TypeError cru', async () => {
+		const mockHttpRequest = jest.fn() as any;
+		mockHttpRequest.mockResolvedValue({ erro: 'UF inválida' });
+
+		await expect(
+			node.methods.loadOptions.getCidades.call(contextoLoadOptions('RJ', mockHttpRequest)),
+		).rejects.toBeInstanceOf(NodeOperationError);
+
+		expect(mockHttpRequest).toHaveBeenCalledTimes(1);
+	});
+
+	it('rejeita e não cacheia lista com itens sem nome/id', async () => {
+		const mockHttpRequest = jest.fn() as any;
+		mockHttpRequest.mockResolvedValue([{ nome: 'Curitiba' }, { id: 4106902 }]);
+
+		const contexto = contextoLoadOptions('PR', mockHttpRequest);
+
+		await expect(
+			node.methods.loadOptions.getCidades.call(contexto),
+		).rejects.toBeInstanceOf(NodeOperationError);
+		expect(mockHttpRequest).toHaveBeenCalledTimes(1);
+
+		// Nada foi cacheado: uma segunda chamada para a mesma UF refaz a requisição.
+		await expect(
+			node.methods.loadOptions.getCidades.call(contexto),
+		).rejects.toBeInstanceOf(NodeOperationError);
+		expect(mockHttpRequest).toHaveBeenCalledTimes(2);
+	});
 });

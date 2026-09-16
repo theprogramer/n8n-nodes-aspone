@@ -18,10 +18,10 @@ export const MAX_FALHAS_CONSECUTIVAS = 3;
  * seria péssima experiência.
  */
 export const PERFIL_IBGE: RetryConfig = {
-	timeoutMs: 15000,
+	timeoutMs: 5000,
 	maxTentativas: 3,
-	backoffInicialMs: 500,
-	backoffMaxMs: 4000,
+	backoffInicialMs: 300,
+	backoffMaxMs: 2000,
 };
 
 interface Faixa {
