@@ -43,6 +43,93 @@ These are the basic steps for working with the starter. For detailed guidance on
 
 Refer to our [documentation on creating nodes](https://docs.n8n.io/integrations/creating-nodes/) for detailed information on building your own nodes.
 
+## Resiliência de rede
+
+O servidor do PNCP é frequentemente lento e instável. O node trata falhas
+transitórias automaticamente, sem quebrar o workflow.
+
+### Configuração (credencial PNCP API)
+
+| Campo | Default | O que faz |
+| --- | --- | --- |
+| Timeout Por Requisição (Ms) | 60000 | Aborta e retenta requisições mais lentas que isso |
+| Máximo De Tentativas | 4 | Total de tentativas, incluindo a primeira |
+| Backoff Inicial (Ms) | 1000 | Base da espera exponencial entre tentativas |
+| Backoff Máximo (Ms) | 16000 | Teto da espera, inclusive do `Retry-After` |
+| Intervalo Entre Páginas (Ms) | 200 | Pausa entre páginas no modo "Buscar Todas Páginas" |
+
+Credenciais salvas antes desta versão continuam funcionando: os campos ausentes
+assumem os defaults acima.
+
+**Retentado:** status `408`, `425`, `429` e qualquer `5xx`; e as falhas de rede
+`ECONNRESET`, `ETIMEDOUT`, `ESOCKETTIMEDOUT`, `EAI_AGAIN`, `EPIPE`,
+`ECONNABORTED` (timeout do cliente — a falha mais comum contra o PNCP) e
+`ECONNREFUSED`.
+
+**Não retentado:** `4xx` como `400`, `401`, `404` e `422` falham de imediato —
+retentar um CNPJ inválido não muda o resultado. `ENOTFOUND` e
+`CERT_HAS_EXPIRED` também são permanentes.
+
+A espera entre tentativas é sorteada entre zero e o teto exponencial. Esse
+jitter não é enfeite: sem ele, todos os workflows que falham no mesmo minuto
+retentam no mesmo instante e mantêm o servidor derrubado. Quando a resposta traz
+o header `Retry-After`, ele é respeitado.
+
+### Resultado parcial na paginação
+
+Com "Buscar Todas Páginas" ligado, a saída ganha dois campos:
+
+```json
+{
+  "data": [],
+  "totalRegistros": 250,
+  "totalPaginas": 25,
+  "paginasBuscadas": 24,
+  "limitePaginasAtingido": false,
+  "paginasComErro": [7],
+  "completo": false
+}
+```
+
+Se uma página falhar em todas as tentativas, o node registra o número em
+`paginasComErro`, marca `completo: false` e continua. Você recebe o que deu para
+buscar em vez de perder a execução inteira. Use `completo` em um nó IF para
+decidir se reprocessa.
+
+Duas exceções: se a **página 1** falhar, o node lança erro — sem ela não há
+`totalPaginas` e não dá para saber o tamanho do que ficou faltando. E se **3
+páginas consecutivas** falharem, o node para (*circuit break*): o servidor está
+fora, insistir só piora.
+
+`Limite De Páginas` conta páginas **tentadas**, incluindo as que falharam.
+
+### Interação com o "Retry On Fail" do n8n
+
+O node já retenta internamente. Se você também ligar o "Retry On Fail" nas
+configurações do node, os dois se multiplicam: com `maxTries: 3` e
+`maxTentativas: 4`, uma página pode ser pedida até 12 vezes.
+
+**Recomendação:** deixe o "Retry On Fail" do n8n desligado, ou no máximo em 2.
+No modo "Buscar Todas Páginas" ele é especialmente caro, porque reexecuta o node
+inteiro e refaz a paginação desde a página 1 — justamente o que a resiliência
+interna existe para evitar.
+
+### Dropdown de municípios (IBGE)
+
+A lista de municípios usa um perfil próprio, mais curto (3 tentativas, timeout
+de 5s), porque é um dropdown do editor com alguém esperando. O n8n não impõe
+timeout próprio em `loadOptions`, então uma espera longa ali chegaria inteira ao
+usuário.
+
+O resultado fica em cache por UF enquanto o processo do n8n viver — a lista do
+IBGE é estática, e antes disso cada abertura do dropdown refazia a chamada.
+
+### Node Dados Abertos
+
+Node declarativo não suporta retry customizado (`retryOnFail` e `maxTries`
+existem em `INode`, não em `INodeTypeDescription`). Ele recebe o que a API
+declarativa permite: timeout explícito de 60s e header `Accept`.
+
 ## License
 
 [MIT](https://github.com/n8n-io/n8n-nodes-starter/blob/master/LICENSE.md)
