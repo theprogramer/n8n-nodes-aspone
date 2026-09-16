@@ -1,6 +1,7 @@
 import type {
 	IExecuteFunctions,
 	INodeExecutionData,
+	JsonObject,
 	NodeConnectionType,
 } from 'n8n-workflow';
 import {
@@ -10,6 +11,42 @@ import {
 	NodeOperationError,
 } from 'n8n-workflow';
 import { pncpProperties } from './descriptions/PncpDescription';
+import {
+	comRetry,
+	esperar,
+	extrairStatus,
+	lerDelayPaginas,
+	lerRetryConfig,
+	MAX_FALHAS_CONSECUTIVAS,
+	PERFIL_IBGE,
+	VERSAO,
+} from '../shared/transport';
+
+/**
+ * A lista de municípios do IBGE é estática. Cachear por UF no escopo do
+ * módulo elimina a maior parte das chamadas: o dropdown do editor refaz a
+ * consulta a cada abertura. O cache vive enquanto o processo do n8n viver.
+ */
+const cacheCidades = new Map<string, Array<{ name: string; value: number }>>();
+
+type MunicipioIBGE = { nome: string; id: number };
+
+/**
+ * Sem essa validação, um corpo inesperado ou vira TypeError cru (se não for
+ * array) ou entra no cache e contamina o dropdown pelo resto do processo
+ * (se for array com itens malformados) — o cache não tem invalidação.
+ */
+function ehListaDeMunicipios(valor: unknown): valor is MunicipioIBGE[] {
+	return (
+		Array.isArray(valor) &&
+		valor.every(
+			(item) =>
+				!!item &&
+				typeof (item as MunicipioIBGE).nome === 'string' &&
+				typeof (item as MunicipioIBGE).id === 'number',
+		)
+	);
+}
 
 export class Pncp implements INodeType {
 	description: INodeTypeDescription = {
@@ -43,15 +80,51 @@ export class Pncp implements INodeType {
 				const uf = this.getCurrentNodeParameter('uf') as string;
 				if (!uf) return [emptyOption];
 
-				const response = (await this.helpers.httpRequest({
-					method: 'GET',
-					url: `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf}/municipios`,
-				})) as Array<{ nome: string; id: number }>;
+				const cacheado = cacheCidades.get(uf);
+				if (cacheado) return [emptyOption, ...cacheado];
+
+				let response: MunicipioIBGE[];
+				try {
+					response = await comRetry(
+						async () =>
+							(await this.helpers.httpRequest({
+								method: 'GET',
+								url: `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf}/municipios`,
+								timeout: PERFIL_IBGE.timeoutMs,
+								headers: { Accept: 'application/json' },
+							})) as MunicipioIBGE[],
+						PERFIL_IBGE,
+					);
+				} catch (erro) {
+					const status = extrairStatus(erro);
+					const causa =
+						status !== undefined
+							? `HTTP ${status}`
+							: (erro as { code?: string })?.code ?? (erro as Error)?.message ?? 'causa desconhecida';
+					const tentativas = (erro as { tentativas?: number })?.tentativas ?? PERFIL_IBGE.maxTentativas;
+
+					// Falha visível é melhor que um dropdown silenciosamente vazio.
+					throw new NodeOperationError(
+						this.getNode(),
+						`Não foi possível carregar os municípios de ${uf}: o serviço do IBGE está indisponível`,
+						{ description: `Falhou após ${tentativas} tentativas (${causa})` },
+					);
+				}
+
+				if (!ehListaDeMunicipios(response)) {
+					// Sem isso, um corpo inesperado ou vira TypeError cru, ou entra
+					// no cache e contamina o dropdown pelo resto do processo.
+					throw new NodeOperationError(
+						this.getNode(),
+						`Resposta inesperada do IBGE ao carregar os municípios de ${uf}`,
+					);
+				}
 
 				const cidades = response
 					.map((cidade) => ({ name: cidade.nome, value: cidade.id }))
 					.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
+				cacheCidades.set(uf, cidades);
 				return [emptyOption, ...cidades];
 			},
 		},
@@ -64,13 +137,18 @@ export class Pncp implements INodeType {
 
 		const credentials = await this.getCredentials('pncpApi');
 		const baseUrl = credentials.baseUrl as string;
+		const retryConfig = lerRetryConfig(credentials);
+		const delayPaginas = lerDelayPaginas(credentials);
 
 		const options = {
 			baseURL: baseUrl,
 			headers: {
 				'Content-Type': 'application/json',
+				Accept: 'application/json',
+				'User-Agent': `n8n-nodes-aspone/${VERSAO}`,
 			},
 			method: 'GET' as const,
+			timeout: retryConfig.timeoutMs,
 		};
 
 		const formatDateToYYYYMMDD = (dateStr: string): string => {
@@ -263,35 +341,81 @@ export class Pncp implements INodeType {
 
 			if (returnAll && isPaginated && endpoint) {
 				const allData: unknown[] = [];
-				let currentPage = 1;
+				const paginasComErro: number[] = [];
+				const errosPorPagina: Array<{
+					pagina: number;
+					statusCode?: number;
+					mensagem?: string;
+					tentativas?: number;
+				}> = [];
 				let totalRegistros = 0;
 				let totalPaginas = 1;
 				let paginasBuscadas = 0;
 				let limiteAtingido = false;
+				let falhasConsecutivas = 0;
 
-				while (true) {
-					qs.pagina = currentPage;
-					const response = await this.helpers.httpRequestWithAuthentication.call(this, 'pncpApi', {
-						...options,
-						url: endpoint,
-						qs: cleanQs(qs),
-					});
+				// `let` no for dá um binding novo por iteração, então o closure do
+				// comRetry enxerga a página daquela volta e não o estado final do laço.
+				for (let paginaAtual = 1; ; paginaAtual++) {
+					try {
+						const response = await comRetry(
+							() =>
+								this.helpers.httpRequestWithAuthentication.call(this, 'pncpApi', {
+									...options,
+									url: endpoint,
+									qs: cleanQs({ ...qs, pagina: paginaAtual }),
+								}),
+							retryConfig,
+						);
 
-					paginasBuscadas++;
-					totalRegistros = (response?.totalRegistros as number) ?? 0;
-					totalPaginas = (response?.totalPaginas as number) ?? 1;
+						falhasConsecutivas = 0;
+						paginasBuscadas++;
+						totalRegistros = (response?.totalRegistros as number) ?? 0;
+						totalPaginas = (response?.totalPaginas as number) ?? 1;
 
-					if (Array.isArray(response?.data)) {
-						allData.push(...response.data);
+						if (Array.isArray(response?.data)) {
+							allData.push(...response.data);
+						}
+					} catch (erroPagina) {
+						// Sem a página 1 não temos totalPaginas, então não há como
+						// seguir nem como saber o tamanho do que ficou faltando.
+						if (paginaAtual === 1) throw erroPagina;
+
+						paginasComErro.push(paginaAtual);
+						// Só o número da página não deixa o usuário distinguir um 429
+						// (tentar de novo mais tarde) de um 404 (não adianta insistir).
+						const errPagina = erroPagina as {
+							response?: { body?: { message?: string; mensagem?: string } };
+							message?: string;
+							tentativas?: number;
+						};
+						errosPorPagina.push({
+							pagina: paginaAtual,
+							statusCode: extrairStatus(erroPagina),
+							mensagem:
+								errPagina?.response?.body?.message ??
+								errPagina?.response?.body?.mensagem ??
+								errPagina?.message,
+							tentativas: errPagina?.tentativas,
+						});
+						falhasConsecutivas++;
 					}
 
-					if (currentPage >= totalPaginas) break;
-					if (paginasBuscadas >= limitePaginas) {
+					// A ordem destas três saídas importa: `limitePaginas` é a única
+					// que marca uma flag na saída, então fica por último para não
+					// sobrescrever um motivo de parada mais específico. Condição
+					// nova que também sinalize algo entra acima dela.
+					// Circuit break: o servidor está fora, insistir só piora.
+					if (falhasConsecutivas >= MAX_FALHAS_CONSECUTIVAS) break;
+					if (paginaAtual >= totalPaginas) break;
+					// paginaAtual é a contagem de páginas tentadas, incluindo as que falharam.
+					if (paginaAtual >= limitePaginas) {
 						limiteAtingido = true;
 						break;
 					}
-					currentPage++;
-					await new Promise((resolve) => setTimeout(resolve, 200));
+					// Jitter no intervalo entre páginas pelo mesmo motivo do backoff:
+					// não sincronizar workflows concorrentes contra o mesmo servidor.
+					await esperar(delayPaginas * (0.5 + Math.random()));
 				}
 
 				returnData.push({
@@ -301,15 +425,22 @@ export class Pncp implements INodeType {
 						totalPaginas,
 						paginasBuscadas,
 						limitePaginasAtingido: limiteAtingido,
+						paginasComErro,
+						errosPorPagina,
+						completo: paginasComErro.length === 0,
 					},
 					pairedItem: { item: 0 },
 				});
 			} else {
-				const response = await this.helpers.httpRequestWithAuthentication.call(this, 'pncpApi', {
-					...options,
-					url: endpoint,
-					qs: cleanQs(qs),
-				});
+				const response = await comRetry(
+					() =>
+						this.helpers.httpRequestWithAuthentication.call(this, 'pncpApi', {
+							...options,
+							url: endpoint,
+							qs: cleanQs(qs),
+						}),
+					retryConfig,
+				);
 
 				returnData.push({
 					json: response,
@@ -319,7 +450,9 @@ export class Pncp implements INodeType {
 		} catch (error) {
 			const err = error as any;
 
-			const statusCode = err?.response?.statusCode;
+			// extrairStatus também cobre `response.status` (formato axios cru), que
+			// `err?.response?.statusCode` sozinho deixaria passar como undefined.
+			const statusCode = extrairStatus(err);
 			const serverBody = err?.response?.body;
 			const serverMessage =
 				serverBody?.message ||
@@ -332,6 +465,7 @@ export class Pncp implements INodeType {
 				statusCode,
 				message: serverMessage,
 				serverResponse: serverBody,
+				tentativas: err?.tentativas,
 			};
 
 			if (this.continueOnFail()) {
@@ -340,7 +474,9 @@ export class Pncp implements INodeType {
 					pairedItem: { item: 0 },
 				});
 			} else {
-				throw new NodeOperationError(this.getNode(), errorPayload, {
+				// `statusCode` pode ser undefined (erro sem resposta HTTP), o que
+				// JsonObject não admite — o n8n descarta a chave ao serializar.
+				throw new NodeOperationError(this.getNode(), errorPayload as unknown as JsonObject, {
 					description: serverMessage,
 				});
 			}

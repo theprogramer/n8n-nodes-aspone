@@ -1018,7 +1018,7 @@ Adicione a `tests/pncp/PncpNode.spec.ts`, dentro do `describe('PncpNode')`, um h
 ```ts
 	/**
 	 * Monta um contexto de execução para `consultarItensPorAno` com returnAll
-	 * ligado. `respostas` é a sequência de resultados (ou erros) por página.
+	 * ligado. A sequência de respostas por página vem do `mockHttpRequest`.
 	 */
 	function contextoPaginado(mockHttpRequest: any, limitePaginas = 10) {
 		const mockExecuteFunctions = {
@@ -1162,6 +1162,7 @@ Por:
 ```ts
 import {
 	comRetry,
+	esperar,
 	lerDelayPaginas,
 	lerRetryConfig,
 	MAX_FALHAS_CONSECUTIVAS,
@@ -1240,15 +1241,17 @@ Por:
 				let falhasConsecutivas = 0;
 
 				while (true) {
-					qs.pagina = currentPage;
+					// Captura a página por valor: o closure do comRetry não pode
+					// depender do estado mutável do laço para saber o que pedir.
+					const paginaAtual = currentPage;
 
 					try {
 						const response = await comRetry(
-							async () =>
-								await this.helpers.httpRequestWithAuthentication.call(this, 'pncpApi', {
+							() =>
+								this.helpers.httpRequestWithAuthentication.call(this, 'pncpApi', {
 									...options,
 									url: endpoint,
-									qs: cleanQs(qs),
+									qs: cleanQs({ ...qs, pagina: paginaAtual }),
 								}),
 							retryConfig,
 						);
@@ -1264,24 +1267,24 @@ Por:
 					} catch (erroPagina) {
 						// Sem a página 1 não temos totalPaginas, então não há como
 						// seguir nem como saber o tamanho do que ficou faltando.
-						if (currentPage === 1) throw erroPagina;
+						if (paginaAtual === 1) throw erroPagina;
 
-						paginasComErro.push(currentPage);
+						paginasComErro.push(paginaAtual);
 						falhasConsecutivas++;
 					}
 
 					// Circuit break: o servidor está fora, insistir só piora.
 					if (falhasConsecutivas >= MAX_FALHAS_CONSECUTIVAS) break;
-					if (currentPage >= totalPaginas) break;
-					// currentPage é a contagem de páginas tentadas, incluindo as que falharam.
-					if (currentPage >= limitePaginas) {
+					if (paginaAtual >= totalPaginas) break;
+					// paginaAtual é a contagem de páginas tentadas, incluindo as que falharam.
+					if (paginaAtual >= limitePaginas) {
 						limiteAtingido = true;
 						break;
 					}
 					currentPage++;
-					await new Promise((resolve) =>
-						setTimeout(resolve, delayPaginas * (0.5 + Math.random())),
-					);
+					// Jitter no intervalo entre páginas pelo mesmo motivo do backoff:
+					// não sincronizar workflows concorrentes contra o mesmo servidor.
+					await esperar(delayPaginas * (0.5 + Math.random()));
 				}
 
 				returnData.push({
@@ -1390,9 +1393,17 @@ describe('PncpNode.getCidades', () => {
 
 		await expect(
 			node.methods.loadOptions.getCidades.call(contextoLoadOptions('AC', mockHttpRequest)),
-		).rejects.toThrow(/IBGE/);
+		).rejects.toBeInstanceOf(NodeOperationError);
 
 		expect(mockHttpRequest).toHaveBeenCalledTimes(3);
+
+		// O automock de `n8n-workflow` não roda o construtor real, então a
+		// instância sai com `message` vazia e nem é `instanceof Error`.
+		// A mensagem só pode ser verificada no argumento do construtor.
+		expect(NodeOperationError).toHaveBeenLastCalledWith(
+			expect.anything(),
+			expect.stringContaining('IBGE'),
+		);
 	}, 15000);
 });
 ```
