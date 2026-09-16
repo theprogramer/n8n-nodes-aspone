@@ -1393,9 +1393,17 @@ describe('PncpNode.getCidades', () => {
 
 		await expect(
 			node.methods.loadOptions.getCidades.call(contextoLoadOptions('AC', mockHttpRequest)),
-		).rejects.toThrow(/IBGE/);
+		).rejects.toBeInstanceOf(NodeOperationError);
 
 		expect(mockHttpRequest).toHaveBeenCalledTimes(3);
+
+		// O automock de `n8n-workflow` não roda o construtor real, então a
+		// instância sai com `message` vazia e nem é `instanceof Error`.
+		// A mensagem só pode ser verificada no argumento do construtor.
+		expect(NodeOperationError).toHaveBeenLastCalledWith(
+			expect.anything(),
+			expect.stringContaining('IBGE'),
+		);
 	}, 15000);
 });
 ```
