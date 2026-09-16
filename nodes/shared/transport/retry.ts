@@ -10,9 +10,10 @@ const CODIGOS_REDE_RETRYAVEIS = new Set([
 	'ESOCKETTIMEDOUT',
 	'EAI_AGAIN',
 	'EPIPE',
-	'ECONNABORTED', // axios: client-side timeout (primary PNCP failure mode)
-	'ECONNREFUSED', // server restarting or briefly down
-	// Note: ENOTFOUND (DNS) and CERT_HAS_EXPIRED stay fatal — they will not fix themselves in retry window
+	'ECONNABORTED', // axios: timeout do lado do cliente, a falha mais comum contra o PNCP
+	'ECONNREFUSED', // servidor reiniciando ou fora do ar por um instante
+	// ENOTFOUND (DNS) e CERT_HAS_EXPIRED ficam de fora de propósito: são
+	// permanentes, não se resolvem na janela de retry.
 ]);
 
 export function extrairStatus(erro: unknown): number | undefined {
