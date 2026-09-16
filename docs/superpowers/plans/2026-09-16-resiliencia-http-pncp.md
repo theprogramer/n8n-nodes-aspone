@@ -1162,6 +1162,7 @@ Por:
 ```ts
 import {
 	comRetry,
+	esperar,
 	lerDelayPaginas,
 	lerRetryConfig,
 	MAX_FALHAS_CONSECUTIVAS,
@@ -1279,9 +1280,9 @@ Por:
 						break;
 					}
 					currentPage++;
-					await new Promise((resolve) =>
-						setTimeout(resolve, delayPaginas * (0.5 + Math.random())),
-					);
+					// Jitter no intervalo entre páginas pelo mesmo motivo do backoff:
+					// não sincronizar workflows concorrentes contra o mesmo servidor.
+					await esperar(delayPaginas * (0.5 + Math.random()));
 				}
 
 				returnData.push({
