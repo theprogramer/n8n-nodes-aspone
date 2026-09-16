@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-aspone",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Nodes n8n para integração com APIs públicas brasileiras (PNCP e Compras Dados Abertos)",
   "keywords": [
     "n8n-community-node-package",
@@ -11,14 +11,14 @@
     "brasil"
   ],
   "license": "MIT",
-  "homepage": "https://github.com/aspone/n8n-nodes-aspone",
+  "homepage": "https://github.com/theprogramer/n8n-nodes-aspone",
   "author": {
     "name": "ASP One",
     "email": "contato@aspone.com.br"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/aspone/n8n-nodes-aspone.git"
+    "url": "git+https://github.com/theprogramer/n8n-nodes-aspone.git"
   },
   "engines": {
     "node": ">=20.15"
@@ -34,7 +34,8 @@
     "test": "jest"
   },
   "files": [
-    "dist"
+    "dist/nodes",
+    "dist/credentials"
   ],
   "n8n": {
     "n8nNodesApiVersion": 1,
