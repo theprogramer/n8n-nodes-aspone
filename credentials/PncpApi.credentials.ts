@@ -1,9 +1,3 @@
-/* eslint-disable n8n-nodes-base/cred-class-field-display-name-miscased */
-// Regra desabilitada: a lib `sentence-case` usada pelo plugin trata caracteres
-// acentuados como separadores, impedindo que qualquer `displayName` em português
-// com acentuação passe na verificação. Mantemos os textos corretamente
-// acentuados para preservar a experiência em pt-BR.
-
 import {
 	ICredentialType,
 	INodeProperties,
