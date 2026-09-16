@@ -1,5 +1,6 @@
 import { describe, it, expect, jest } from '@jest/globals';
 import type { IExecuteFunctions } from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
 import { Pncp } from '../../nodes/Pncp/Pncp.node';
 
 jest.mock('n8n-workflow');
@@ -193,7 +194,9 @@ describe('PncpNode', () => {
 		const mockHttpRequest = jest.fn() as any;
 		mockHttpRequest.mockRejectedValue({ response: { statusCode: 504 } });
 
-		await expect(node.execute.call(contextoPaginado(mockHttpRequest))).rejects.toBeDefined();
+		await expect(node.execute.call(contextoPaginado(mockHttpRequest))).rejects.toBeInstanceOf(
+			NodeOperationError,
+		);
 		expect(mockHttpRequest).toHaveBeenCalledTimes(1);
 	});
 

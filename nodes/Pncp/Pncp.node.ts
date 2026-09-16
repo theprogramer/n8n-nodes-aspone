@@ -277,18 +277,15 @@ export class Pncp implements INodeType {
 			if (returnAll && isPaginated && endpoint) {
 				const allData: unknown[] = [];
 				const paginasComErro: number[] = [];
-				let currentPage = 1;
 				let totalRegistros = 0;
 				let totalPaginas = 1;
 				let paginasBuscadas = 0;
 				let limiteAtingido = false;
 				let falhasConsecutivas = 0;
 
-				while (true) {
-					// Captura a página por valor: o closure do comRetry não pode
-					// depender do estado mutável do laço para saber o que pedir.
-					const paginaAtual = currentPage;
-
+				// `let` no for dá um binding novo por iteração, então o closure do
+				// comRetry enxerga a página daquela volta e não o estado final do laço.
+				for (let paginaAtual = 1; ; paginaAtual++) {
 					try {
 						const response = await comRetry(
 							() =>
@@ -317,6 +314,10 @@ export class Pncp implements INodeType {
 						falhasConsecutivas++;
 					}
 
+					// A ordem destas três saídas importa: `limitePaginas` é a única
+					// que marca uma flag na saída, então fica por último para não
+					// sobrescrever um motivo de parada mais específico. Condição
+					// nova que também sinalize algo entra acima dela.
 					// Circuit break: o servidor está fora, insistir só piora.
 					if (falhasConsecutivas >= MAX_FALHAS_CONSECUTIVAS) break;
 					if (paginaAtual >= totalPaginas) break;
@@ -325,7 +326,6 @@ export class Pncp implements INodeType {
 						limiteAtingido = true;
 						break;
 					}
-					currentPage++;
 					// Jitter no intervalo entre páginas pelo mesmo motivo do backoff:
 					// não sincronizar workflows concorrentes contra o mesmo servidor.
 					await esperar(delayPaginas * (0.5 + Math.random()));
